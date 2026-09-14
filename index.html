@@ -1,6 +1,6 @@
 <!doctype html>
 <html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Share</title>
+<title>FileShare</title>
 <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
@@ -20,14 +20,14 @@ body{
   font-family:var(--font-sans); font-size:14px;
   -webkit-font-smoothing:antialiased;
 }
-h1{font-size:13px;font-weight:600;margin:0;font-family:var(--font-mono);letter-spacing:-.26px}
-.tagline{color:var(--sub);font-size:10px;margin:2px 0 0;font-family:var(--font-mono)}
+h1{font-size:13px;font-weight:600;margin:0;font-family:var(--font-sans);letter-spacing:-.26px}
+.tagline{color:var(--sub);font-size:10px;margin:2px 0 0;font-family:var(--font-sans)}
 h3{margin:0 0 10px;font-size:10px;font-weight:500;color:var(--sub);
   text-transform:uppercase;letter-spacing:1px;font-family:var(--font-sans)}
 label{font-size:11px;color:var(--sub);display:block;margin-bottom:6px}
 input[type=text]{
   width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:6px;
-  font-size:11px;background:transparent;color:var(--text);outline:none;font-family:var(--font-mono);
+  font-size:11px;background:transparent;color:var(--text);outline:none;font-family:var(--font-sans);
 }
 input[type=text]:focus{border-color:var(--blue)}
 input[type=text]::placeholder{color:var(--sub)}
@@ -46,7 +46,7 @@ input[type=text]::placeholder{color:var(--sub)}
   padding:2px 0 8px;color:var(--blue);font-family:var(--font-mono)}
 #qrbox{display:flex;justify-content:center;padding:6px 0 2px}
 #qrbox img,#qrbox canvas{border-radius:8px;width:110px;height:110px}
-.status{display:flex;align-items:center;gap:7px;font-size:11px;color:var(--sub);font-family:var(--font-mono)}
+.status{display:flex;align-items:center;gap:7px;font-size:11px;color:var(--sub);font-family:var(--font-sans)}
 .dot{width:6px;height:6px;border-radius:50%;background:var(--sub);flex:none}
 .dot.live{background:var(--green)}
 .dot.pending{background:var(--orange)}
@@ -62,7 +62,7 @@ input[type=text]::placeholder{color:var(--sub)}
 .brand-icon{width:22px;height:22px;border-radius:5px;background:var(--blue);flex:none;
   display:flex;align-items:center;justify-content:center;color:#fff}
 .topbar .tagline{margin:0}
-.topbar-me{display:flex;align-items:center;gap:7px;font-family:var(--font-mono);font-size:11px;color:var(--sub)}
+.topbar-me{display:flex;align-items:center;gap:7px;font-family:var(--font-sans);font-size:11px;color:var(--sub)}
 .panels{display:flex;flex-direction:column;flex:1;min-height:0}
 .sidebar,.rightpanel{padding:16px;display:flex;flex-direction:column;gap:12px}
 .sidebar{background:var(--panel);border-bottom:1px solid var(--border)}
@@ -87,21 +87,22 @@ input[type=text]::placeholder{color:var(--sub)}
 .device-row .dot{flex:none}
 .device-row .device-meta{flex:1;overflow:hidden}
 .device-row .device-name{font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
-  font-size:11px;font-family:var(--font-mono);color:var(--text)}
+  font-size:11px;font-family:var(--font-sans);color:var(--text)}
 .device-row .device-sub{font-size:10px;color:var(--sub);display:flex;align-items:center;gap:5px;
-  font-family:var(--font-mono);margin-top:2px}
+  font-family:var(--font-sans);margin-top:2px}
 .device-row .chevron{flex:none;font-size:13px;opacity:.7}
 .avatar{width:24px;height:24px;border-radius:50%;background:var(--blue);color:#fff;
   font-size:11px;font-weight:600;display:flex;align-items:center;justify-content:center;flex:none}
 .os-badge{font-size:9px;font-weight:500;color:var(--sub);background:var(--panel);
-  border-radius:4px;padding:1px 4px;flex:none;font-family:var(--font-mono)}
-.devices-count{font-size:10px;color:var(--sub);text-align:center;padding-top:4px;font-family:var(--font-mono)}
+  border-radius:4px;padding:1px 4px;flex:none;font-family:var(--font-sans)}
+.devices-count{font-size:10px;color:var(--sub);text-align:center;padding-top:4px;font-family:var(--font-sans)}
+.footer-credit{margin-top:auto;padding-top:16px;font-size:11px;color:var(--sub);text-align:center}
 .target-header{display:flex;align-items:center;gap:10px}
 .target-header .meta{flex:1;overflow:hidden}
-.target-header .name{font-size:14px;font-weight:600;font-family:var(--font-mono)}
-.target-header .sub{font-size:11px;color:var(--sub);font-family:var(--font-mono);margin-top:2px}
+.target-header .name{font-size:14px;font-weight:600;font-family:var(--font-sans)}
+.target-header .sub{font-size:11px;color:var(--sub);font-family:var(--font-sans);margin-top:2px}
 .busy-pill{margin-left:auto;flex:none;background:rgba(255,166,87,.12);color:var(--orange);
-  font-size:10px;font-weight:500;font-family:var(--font-mono);padding:4px 8px;border-radius:5px;
+  font-size:10px;font-weight:500;font-family:var(--font-sans);padding:4px 8px;border-radius:5px;
   border:1px solid rgba(255,166,87,.3)}
 
 .queue-head{display:flex;align-items:center;justify-content:space-between;
@@ -109,7 +110,7 @@ input[type=text]::placeholder{color:var(--sub)}
   font-family:var(--font-sans);padding-bottom:8px;margin-bottom:2px;border-bottom:1px solid var(--border)}
 .queue-head a{color:var(--blue);text-decoration:none;text-transform:none;letter-spacing:normal;font-size:11px;cursor:pointer}
 .file-icon{width:20px;height:20px;flex:none;color:var(--sub);display:flex;align-items:center;justify-content:center}
-.send-total{font-size:11px;color:var(--sub);font-family:var(--font-mono);white-space:nowrap}
+.send-total{font-size:11px;color:var(--sub);font-family:var(--font-sans);white-space:nowrap}
 
 /* Fixed, compact box - never balloons to fill the page even when nothing
    is queued. The staged-files list below it (not this box) is what grows
@@ -139,7 +140,7 @@ body.dragging{outline:3px dashed var(--blue);outline-offset:-3px}
 .tab.active{color:var(--text);border-bottom-color:var(--blue)}
 .tabpanel{flex:1;overflow-y:auto;min-height:0}
 .tab-badge{display:inline-block;background:var(--blue);color:#fff;font-size:9px;font-weight:600;
-  border-radius:8px;padding:1px 5px;margin-left:3px;font-family:var(--font-mono)}
+  border-radius:8px;padding:1px 5px;margin-left:3px;font-family:var(--font-sans)}
 
 .filerow .progress{height:3px;background:var(--border);border-radius:2px;margin-top:6px;overflow:hidden}
 .filerow .progress-bar{height:100%;background:var(--blue);border-radius:2px;transition:width .15s}
@@ -154,12 +155,12 @@ body.dragging{outline:3px dashed var(--blue);outline-offset:-3px}
 .filerow .progress{flex-basis:100%}
 .filerow:last-child{border-bottom:none}
 .filerow .meta{flex:1;overflow:hidden}
-.filerow .name{font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-family:var(--font-mono)}
+.filerow .name{font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-family:var(--font-sans)}
 .filerow .name a{color:var(--text);text-decoration:none}
 .filerow .from{font-size:11px;color:var(--sub)}
-.filerow .size{font-size:11px;color:var(--sub);flex:none;font-family:var(--font-mono)}
+.filerow .size{font-size:11px;color:var(--sub);flex:none;font-family:var(--font-sans)}
 .filerow .right{display:flex;flex-direction:column;align-items:flex-end;flex:none;gap:2px}
-.filerow .time{font-size:10px;color:var(--sub);font-family:var(--font-mono)}
+.filerow .time{font-size:10px;color:var(--sub);font-family:var(--font-sans)}
 .filerow button{flex:none;border:none;background:none;color:var(--red);font-size:12px;cursor:pointer;padding:4px 6px}
 .empty{color:var(--sub);font-size:12px;text-align:center;padding:16px 0}
 .badge{width:20px;height:20px;border-radius:50%;flex:none;color:#fff;font-size:11px;
@@ -190,8 +191,8 @@ body.dragging{outline:3px dashed var(--blue);outline-offset:-3px}
 
   <header class="topbar">
     <div class="topbar-brand">
-      <span class="brand-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V9z"/><path d="M14 3v5h5"/><circle cx="10" cy="14.5" r="2"/><path d="M11.6 13C13 10.5 15.3 9 18 8.5"/><path d="M18 8.5l-2.4.4M18 8.5l-.9 2.2"/></svg></span>
-      <h1>Share</h1><span class="tagline" id="versionTag"></span>
+      <span class="brand-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V9z"/><path d="M14 3v5h5"/><circle cx="10" cy="14.5" r="2"/><path d="M11.6 13C13 10.5 15.3 9 18 8.5"/><path d="M18 8.5l-2.4.4M18 8.5l-.9 2.2"/></svg></span>
+      <h1>FileShare</h1><span class="tagline" id="versionTag"></span>
     </div>
     <div class="topbar-me">
       <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5a11 11 0 0 1 14 0"/><path d="M8.5 16a6 6 0 0 1 7 0"/><path d="M12 19.5h.01"/></svg>
@@ -241,6 +242,8 @@ body.dragging{outline:3px dashed var(--blue);outline-offset:-3px}
       <div id="peerList"><div class="empty">none connected yet</div></div>
       <div class="devices-count" id="devicesCount"></div>
     </div>
+
+    <div class="footer-credit">made with &#10084;&#65039; by AD</div>
   </aside>
 
   <main class="workspace">
@@ -278,7 +281,7 @@ body.dragging{outline:3px dashed var(--blue);outline-offset:-3px}
 </div>
 
 <script>
-const VERSION = 'v31';
+const VERSION = 'v32';
 document.getElementById('versionTag').textContent = '· ' + VERSION;
 
 // A stuck old Service Worker from an earlier version of this page could
@@ -411,7 +414,19 @@ const ICE_CONFIG = {
 
 function randomCode() { return String(Math.floor(100000 + Math.random() * 900000)); }
 
+// Every earlier failed attempt (wrong code, unavailable id, network hiccup)
+// left its Peer object dangling - createRoom()/joinRoom() just overwrote the
+// `peer` variable with a new one without ever destroying the old signaling
+// connection. Retrying enough times could pile up zombie connections to the
+// PeerJS broker and leave later attempts unable to connect at all. Always
+// tear down whatever's there before starting a fresh one.
+function resetPeer() {
+  if (peer) { try { peer.destroy(); } catch (err) { /* already gone */ } }
+  peer = null;
+}
+
 function createRoom() {
+  resetPeer();
   const code = randomCode();
   setStatus('opening room ' + code + '...', 'pending');
   peer = new Peer(code, { config: ICE_CONFIG });
@@ -435,6 +450,7 @@ function createRoom() {
 function joinRoom(codeOverride) {
   const code = codeOverride || document.getElementById('joinCode').value.trim();
   if (!/^\d{4,6}$/.test(code)) { alert('enter the 4-6 digit code'); return; }
+  resetPeer();
   setStatus('connecting to room ' + code + '...', 'pending');
   peer = new Peer({ config: ICE_CONFIG });
   peer.on('open', () => {
