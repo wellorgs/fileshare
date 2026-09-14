@@ -200,13 +200,38 @@ function joinRoom(codeOverride) {
   });
 }
 
+// PeerJS's default "binary" serialization silently corrupts ArrayBuffers
+// sent through conn.send() (data arrives truncated to 0 bytes) - a library
+// bug, reproduced directly against unpkg's build. PeerJS is used only to
+// establish the connection (room codes, ICE/NAT traversal); all real
+// traffic goes straight over the underlying RTCDataChannel, bypassing
+// PeerJS's serializer entirely.
 function addConn(conn) {
   const entry = { conn, name: (conn.metadata && conn.metadata.name) || 'a device' };
   conns.set(conn.peer, entry);
   conn.on('open', () => {
-    conn.send({ type: 'hello', name: myName() });
+    const dc = conn.dataChannel;
+    dc.binaryType = 'arraybuffer';
+    dc.send(JSON.stringify({ type: 'hello', name: myName() }));
     setStatus(conns.size + ' device' + (conns.size > 1 ? 's' : '') + ' connected', 'live');
     renderPeerList();
+
+    dc.onmessage = async (e) => {
+      if (typeof e.data === 'string') {
+        const msg = JSON.parse(e.data);
+        if (msg.type === 'hello') {
+          entry.name = msg.name;
+          renderPeerList();
+        } else if (msg.type === 'file-start') {
+          conn._incoming = await startIncoming(msg.name, msg.size, entry.name);
+        } else if (msg.type === 'file-end' && conn._incoming) {
+          await conn._incoming.finish();
+          conn._incoming = null;
+        }
+      } else if (conn._incoming) {
+        await conn._incoming.write(e.data);
+      }
+    };
   });
   conn.on('close', () => {
     conns.delete(conn.peer);
@@ -214,20 +239,6 @@ function addConn(conn) {
     setStatus(conns.size ? conns.size + ' device' + (conns.size > 1 ? 's' : '') + ' connected' : 'disconnected', conns.size ? 'live' : 'err');
   });
   conn.on('error', err => console.error('connection error', err));
-
-  conn.on('data', async (data) => {
-    if (data && data.type === 'hello') {
-      entry.name = data.name;
-      renderPeerList();
-    } else if (data && data.type === 'file-start') {
-      conn._incoming = await startIncoming(data.name, data.size, entry.name);
-    } else if (data && data.type === 'file-end' && conn._incoming) {
-      await conn._incoming.finish();
-      conn._incoming = null;
-    } else if (conn._incoming && data instanceof ArrayBuffer) {
-      await conn._incoming.write(data);
-    }
-  });
 }
 
 // ---- receiving: streams to disk, never buffers the whole file ----
@@ -328,20 +339,21 @@ function showEmptyIfNeeded() {
 
 const CHUNK = 16 * 1024;
 async function sendFileTo(conn, file) {
-  conn.send({ type: 'file-start', name: file.name, size: file.size });
+  const dc = conn.dataChannel;
+  dc.send(JSON.stringify({ type: 'file-start', name: file.name, size: file.size }));
   const reader = file.stream().getReader();
   while (true) {
     const { done, value } = await reader.read();
     if (done) break;
     for (let off = 0; off < value.byteLength; off += CHUNK) {
       const slice = value.slice(off, off + CHUNK).buffer;
-      while ((conn.dataChannel?.bufferedAmount || 0) > 8 * 1024 * 1024) {
+      while (dc.bufferedAmount > 8 * 1024 * 1024) {
         await new Promise(r => setTimeout(r, 20));
       }
-      conn.send(slice);
+      dc.send(slice);
     }
   }
-  conn.send({ type: 'file-end' });
+  dc.send(JSON.stringify({ type: 'file-end' }));
 }
 
 async function sendFiles(fileList) {
