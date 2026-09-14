@@ -51,7 +51,17 @@ small{color:#666}
 <script>
 let peer, conn;
 const statusEl = document.getElementById('status');
-function setStatus(s) { statusEl.textContent = s; }
+function setStatus(s) { statusEl.textContent = s; console.log('[status]', s); }
+
+// Plain STUN fails on plenty of home routers (no NAT hairpin support) - add a
+// free public TURN relay as fallback so the connection actually completes.
+const ICE_CONFIG = {
+  iceServers: [
+    { urls: 'stun:stun.l.google.com:19302' },
+    { urls: 'turn:openrelay.metered.ca:80', username: 'openrelayproject', credential: 'openrelayproject' },
+    { urls: 'turn:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' }
+  ]
+};
 
 function randomCode() {
   return String(Math.floor(100000 + Math.random() * 900000));
@@ -59,36 +69,44 @@ function randomCode() {
 
 function createRoom() {
   const code = randomCode();
-  peer = new Peer(code);
+  setStatus('opening room ' + code + '...');
+  peer = new Peer(code, { config: ICE_CONFIG });
   peer.on('open', () => {
     document.getElementById('roomCode').textContent = code;
     document.getElementById('codeBox').classList.remove('hidden');
-    setStatus('waiting for the other device to connect...');
+    setStatus('room ' + code + ' open — waiting for the other device...');
   });
   peer.on('connection', c => { conn = c; setupConnection(); });
+  peer.on('disconnected', () => setStatus('lost connection to signaling server, retrying...'));
   peer.on('error', err => {
     if (err.type === 'unavailable-id') { createRoom(); } // code taken, try another
-    else setStatus('error: ' + err.type);
+    else { setStatus('error: ' + err.type); alert('Connection setup failed: ' + err.type); }
   });
 }
 
 function joinRoom() {
   const code = document.getElementById('joinCode').value.trim();
   if (!/^\d{4,6}$/.test(code)) { alert('enter the 4-6 digit code'); return; }
-  peer = new Peer();
+  setStatus('connecting to room ' + code + '...');
+  peer = new Peer({ config: ICE_CONFIG });
   peer.on('open', () => {
     conn = peer.connect(code, { reliable: true });
     setupConnection();
   });
-  peer.on('error', err => setStatus('error: ' + err.type));
+  peer.on('error', err => {
+    setStatus('error: ' + err.type);
+    alert('Could not connect: ' + err.type + (err.type === 'peer-unavailable' ? ' (check the code, or the other device may not have created the room yet)' : ''));
+  });
 }
 
 function setupConnection() {
+  setStatus('found ' + conn.peer + ', negotiating connection...');
   conn.on('open', () => {
-    setStatus('connected');
+    setStatus('connected to room ' + conn.peer);
     document.getElementById('transfer').classList.remove('hidden');
   });
   conn.on('close', () => setStatus('disconnected'));
+  conn.on('error', err => { setStatus('connection error: ' + err); alert('Connection error: ' + err); });
   let incoming = null;
   conn.on('data', async (data) => {
     if (data && data.type === 'file-start') {
@@ -147,9 +165,15 @@ const drop = document.getElementById('drop');
   e.preventDefault(); drop.classList.remove('over');
 }));
 drop.addEventListener('drop', async e => {
+  if (!conn || !conn.open) { alert('not connected yet — wait for status to say "connected"'); return; }
   for (const file of e.dataTransfer.files) {
     drop.textContent = 'sending ' + file.name + '...';
-    await sendFile(file);
+    try {
+      await sendFile(file);
+    } catch (err) {
+      alert('send failed: ' + err.message);
+      break;
+    }
   }
   drop.textContent = 'Drag a file here to send it';
 });
