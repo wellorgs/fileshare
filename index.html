@@ -4,49 +4,52 @@
 <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@400;500;600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
+/* Palette matches the reference design 1:1 (GitHub dark theme colors). */
 :root{
-  --bg:#f2f2f7; --panel:#ffffff; --card:#f7f7f9; --text:#1c1c1e; --sub:#8a8a8e;
-  --blue:#007aff; --red:#ff3b30; --green:#34c759; --border:#e5e5ea;
-}
-@media (prefers-color-scheme: dark){
-  :root{ --bg:#000000; --panel:#161618; --card:#1c1c1e; --text:#f2f2f7; --sub:#8a8a8e; --border:#2c2c2e; }
+  --bg:#0d1117; --panel:#161b22; --card:#21262d; --text:#e6edf3; --sub:#8b949e;
+  --blue:#1f6feb; --red:#f85149; --green:#3fb950; --orange:#ffa657; --border:#30363d;
+  --font-mono:"Geist Mono",ui-monospace,"SF Mono",monospace;
+  --font-sans:Inter,-apple-system,BlinkMacSystemFont,sans-serif;
 }
 *{box-sizing:border-box}
 body{
   margin:0; min-height:100vh; background:var(--bg); color:var(--text);
-  font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text",system-ui,sans-serif;
+  font-family:var(--font-sans); font-size:14px;
   -webkit-font-smoothing:antialiased;
 }
-h1{font-size:19px;font-weight:700;margin:0}
-.tagline{color:var(--sub);font-size:11px;margin:2px 0 0}
-h3{margin:0 0 10px;font-size:12px;font-weight:600;color:var(--sub);
-  text-transform:uppercase;letter-spacing:.4px}
-label{font-size:13px;color:var(--sub);display:block;margin-bottom:6px}
+h1{font-size:13px;font-weight:600;margin:0;font-family:var(--font-mono);letter-spacing:-.26px}
+.tagline{color:var(--sub);font-size:10px;margin:2px 0 0;font-family:var(--font-mono)}
+h3{margin:0 0 10px;font-size:10px;font-weight:500;color:var(--sub);
+  text-transform:uppercase;letter-spacing:1px;font-family:var(--font-sans)}
+label{font-size:12px;color:var(--sub);display:block;margin-bottom:6px}
 input[type=text]{
-  width:100%;padding:11px 13px;border:1px solid var(--border);border-radius:10px;
-  font-size:15px;background:transparent;color:var(--text);outline:none;
+  width:100%;padding:9px 11px;border:1px solid var(--border);border-radius:6px;
+  font-size:12px;background:transparent;color:var(--text);outline:none;font-family:var(--font-mono);
 }
 input[type=text]:focus{border-color:var(--blue)}
+input[type=text]::placeholder{color:var(--sub)}
 .btn{
-  padding:12px;border:none;border-radius:10px;font-size:14px;font-weight:600;
-  cursor:pointer;transition:opacity .15s;
+  padding:9px 14px;border:none;border-radius:6px;font-size:12.5px;font-weight:500;
+  cursor:pointer;transition:opacity .15s;font-family:var(--font-sans);
 }
 .btn:active{opacity:.7}
 .btn:disabled{opacity:.4;cursor:default}
 .btn-primary{background:var(--blue);color:#fff;width:100%}
-.btn-secondary{background:var(--border);color:var(--text)}
+.btn-secondary{background:var(--card);color:var(--text);border:1px solid var(--border)}
 .row{display:flex;gap:8px}
 .row input{flex:1}
 .row .btn{flex:none;width:auto}
 .code{font-size:26px;font-weight:700;letter-spacing:4px;text-align:center;
-  padding:2px 0 8px;color:var(--blue)}
+  padding:2px 0 8px;color:var(--blue);font-family:var(--font-mono)}
 #qrbox{display:flex;justify-content:center;padding:6px 0 2px}
 #qrbox img,#qrbox canvas{border-radius:8px;width:110px;height:110px}
-.status{display:flex;align-items:center;gap:7px;font-size:13px;color:var(--sub)}
-.dot{width:7px;height:7px;border-radius:50%;background:var(--sub);flex:none}
+.status{display:flex;align-items:center;gap:7px;font-size:12px;color:var(--sub);font-family:var(--font-mono)}
+.dot{width:6px;height:6px;border-radius:50%;background:var(--sub);flex:none}
 .dot.live{background:var(--green)}
-.dot.pending{background:#ff9500}
+.dot.pending{background:var(--orange)}
 .dot.err{background:var(--red)}
 .hidden{display:none !important}
 
@@ -56,63 +59,64 @@ input[type=text]:focus{border-color:var(--blue)}
 .sidebar{background:var(--panel);border-bottom:1px solid var(--border)}
 .rightpanel{background:var(--panel);border-top:1px solid var(--border)}
 .workspace{padding:16px;display:flex;flex-direction:column;gap:12px;flex:1}
-.section{background:var(--card);border-radius:14px;padding:14px}
+.section{background:var(--card);border-radius:8px;padding:12px;border:1px solid var(--border)}
 .brand{display:flex;align-items:baseline;gap:8px;margin-bottom:2px}
 
 .devices-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
 .devices-head h3{margin:0}
-.icon-btn{border:none;background:none;color:var(--sub);cursor:pointer;font-size:14px;
+.icon-btn{border:none;background:none;color:var(--sub);cursor:pointer;font-size:13px;
   padding:2px 4px;line-height:1;border-radius:6px}
-.icon-btn:hover{background:var(--card);color:var(--text)}
+.icon-btn:hover{background:var(--panel);color:var(--text)}
 .icon-btn:active{opacity:.6}
-.device-row{display:flex;align-items:center;gap:9px;padding:7px 8px;font-size:13px;
-  border-radius:8px;cursor:pointer}
-.device-row:hover{background:var(--card)}
-.device-row.selected{background:var(--blue);color:#fff}
-.device-row.selected .os-badge{color:#fff;border-color:rgba(255,255,255,.5)}
-.device-row.selected .device-sub{color:rgba(255,255,255,.8)}
+.device-row{display:flex;align-items:center;gap:9px;padding:9px 10px;font-size:13px;
+  border-radius:6px;cursor:pointer;border-left:2px solid transparent}
+.device-row:hover{background:rgba(255,255,255,.03)}
+.device-row.selected{background:rgba(31,111,235,.12);border-left-color:var(--blue)}
 .device-row .dot{flex:none}
 .device-row .device-meta{flex:1;overflow:hidden}
-.device-row .device-name{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.device-row .device-sub{font-size:11px;color:var(--sub);display:flex;align-items:center;gap:5px}
+.device-row .device-name{font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  font-size:11px;font-family:var(--font-mono);color:var(--text)}
+.device-row .device-sub{font-size:10px;color:var(--sub);display:flex;align-items:center;gap:5px;
+  font-family:var(--font-mono);margin-top:2px}
 .device-row .chevron{flex:none;font-size:13px;opacity:.7}
 .avatar{width:24px;height:24px;border-radius:50%;background:var(--blue);color:#fff;
   font-size:11px;font-weight:600;display:flex;align-items:center;justify-content:center;flex:none}
-.os-badge{font-size:9px;font-weight:700;color:var(--sub);border:1px solid var(--border);
-  border-radius:4px;padding:1px 4px;flex:none}
-.devices-count{font-size:11px;color:var(--sub);text-align:center;padding-top:4px}
+.os-badge{font-size:9px;font-weight:500;color:var(--sub);background:var(--panel);
+  border-radius:4px;padding:1px 4px;flex:none;font-family:var(--font-mono)}
+.devices-count{font-size:10px;color:var(--sub);text-align:center;padding-top:4px;font-family:var(--font-mono)}
 .target-header{display:flex;align-items:center;gap:10px}
 .target-header .meta{flex:1;overflow:hidden}
-.target-header .name{font-size:14px;font-weight:600}
-.target-header .sub{font-size:11px;color:var(--sub)}
+.target-header .name{font-size:14px;font-weight:600;font-family:var(--font-mono)}
+.target-header .sub{font-size:11px;color:var(--sub);font-family:var(--font-mono);margin-top:2px}
 
 #drop{
-  border:2px dashed var(--border);border-radius:14px;padding:14px 16px;text-align:center;
-  color:var(--sub);font-size:14px;transition:.15s;flex:1;display:flex;
-  align-items:center;justify-content:center;min-height:120px;
+  border:2px dashed var(--border);border-radius:8px;padding:14px 16px;text-align:center;
+  color:var(--sub);font-size:13px;transition:.15s;flex:1;display:flex;
+  align-items:center;justify-content:center;min-height:120px;font-family:var(--font-sans)
 }
-#drop.over{border-color:var(--blue);background:rgba(0,122,255,.06)}
+#drop.over{border-color:var(--blue);background:rgba(31,111,235,.06)}
 body.dragging{outline:3px dashed var(--blue);outline-offset:-3px}
 .workspace-actions{display:flex;gap:10px}
 .workspace-actions .btn{flex:1}
 
-.tabs{display:flex;gap:4px;background:var(--card);border-radius:10px;padding:3px}
-.tab{flex:1;border:none;background:none;padding:8px;border-radius:8px;font-size:13px;
-  font-weight:600;color:var(--sub);cursor:pointer}
-.tab.active{background:var(--panel);color:var(--text);box-shadow:0 1px 2px rgba(0,0,0,.06)}
+.tabs{display:flex;gap:4px;background:transparent;border-bottom:1px solid var(--border);padding:0}
+.tab{flex:1;border:none;background:none;padding:10px 0;border-radius:0;font-size:11px;
+  font-weight:500;color:var(--sub);cursor:pointer;font-family:var(--font-sans);
+  border-bottom:2px solid transparent;margin-bottom:-1px}
+.tab.active{color:var(--text);border-bottom-color:var(--blue)}
 .tabpanel{flex:1;overflow-y:auto;min-height:0}
 
 .filerow{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border)}
 .filerow:last-child{border-bottom:none}
 .filerow .meta{flex:1;overflow:hidden}
-.filerow .name{font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.filerow .name{font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-family:var(--font-mono)}
 .filerow .name a{color:var(--text);text-decoration:none}
 .filerow .from{font-size:11px;color:var(--sub)}
-.filerow .size{font-size:11px;color:var(--sub);flex:none}
+.filerow .size{font-size:11px;color:var(--sub);flex:none;font-family:var(--font-mono)}
 .filerow .right{display:flex;flex-direction:column;align-items:flex-end;flex:none;gap:2px}
-.filerow .time{font-size:10px;color:var(--sub)}
+.filerow .time{font-size:10px;color:var(--sub);font-family:var(--font-mono)}
 .filerow button{flex:none;border:none;background:none;color:var(--red);font-size:12px;cursor:pointer;padding:4px 6px}
-.empty{color:var(--sub);font-size:13px;text-align:center;padding:16px 0}
+.empty{color:var(--sub);font-size:12px;text-align:center;padding:16px 0}
 .badge{width:20px;height:20px;border-radius:50%;flex:none;color:#fff;font-size:11px;
   display:flex;align-items:center;justify-content:center;font-weight:700}
 .badge.in{background:var(--green)}
@@ -126,6 +130,13 @@ body.dragging{outline:3px dashed var(--blue);outline-offset:-3px}
   .sidebar{width:280px;flex:none;border-bottom:none;border-right:1px solid var(--border);overflow-y:auto}
   .workspace{flex:1;min-width:0}
   .rightpanel{width:300px;flex:none;border-top:none;border-left:1px solid var(--border)}
+}
+/* Below the breakpoint, panels stack in normal document flow with no fixed
+   height, so a flex:1 child (the drop zone) has nothing to grow against and
+   collapses to its min-height - give the workspace column a real height so
+   the drop zone actually fills the screen instead of a small box. */
+@media (max-width:899px){
+  .workspace{min-height:70vh}
 }
 </style></head>
 <body>
@@ -201,7 +212,7 @@ body.dragging{outline:3px dashed var(--blue);outline-offset:-3px}
 </div>
 
 <script>
-const VERSION = 'v24';
+const VERSION = 'v25';
 document.getElementById('versionTag').textContent = '· ' + VERSION;
 
 // A stuck old Service Worker from an earlier version of this page could
