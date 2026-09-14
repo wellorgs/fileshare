@@ -6,12 +6,11 @@ Two ways to send files directly between two computers, no cloud storage involved
 
 Open **https://wellorgs.github.io/fileshare-local/** on both devices.
 
-1. On device 1, click **Generate connect code**, send that code to device 2 (chat, email, anything).
-2. On device 2, paste it under **Option B: Join with a code**, click **Generate reply code**, send that code back.
-3. On device 1, paste the reply code and click **Finish connecting**.
-4. Once status says "connected", drag a file onto either page to send it to the other — it downloads straight there.
+1. On device 1, click **Create room** — it shows a 6-digit code.
+2. On device 2, type that code under **Option B: Join with a code**, click **Connect**.
+3. Once status says "connected" on both, drag a file onto either page to send it to the other — it downloads straight there.
 
-This uses WebRTC: once connected, files go directly browser-to-browser (peer-to-peer). The code exchange is just to establish that connection; GitHub never sees your files. Works on any network, including different WiFi networks, as long as neither side is behind strict corporate NAT (in which case use Option B).
+This uses WebRTC: once connected, files go directly browser-to-browser (peer-to-peer). The 6-digit code is just a room name on a free public signaling broker used to set up that connection; GitHub never sees your files, and neither does the broker. Works on any network, including different WiFi networks, as long as neither side is behind strict corporate NAT (in which case use Option B).
 
 ## Option B — local script, same WiFi only, zero setup friction
 

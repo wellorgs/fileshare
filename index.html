@@ -1,12 +1,14 @@
 <!doctype html>
 <html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>P2P File Share</title>
+<script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
 <style>
 body{font-family:sans-serif;max-width:680px;margin:30px auto;padding:0 16px;line-height:1.4}
 h2{margin-bottom:4px}
 .step{border:1px solid #ddd;border-radius:10px;padding:16px;margin:14px 0}
 .step h3{margin:0 0 8px}
-textarea{width:100%;box-sizing:border-box;height:70px;font-family:monospace;font-size:12px}
+.code{font-size:32px;font-weight:bold;letter-spacing:4px;text-align:center;padding:14px;background:#f4f4f4;border-radius:8px}
+input{padding:8px;font-size:18px;width:140px;text-align:center;letter-spacing:2px}
 button{padding:8px 14px;margin-top:6px;cursor:pointer}
 #drop{border:3px dashed #888;border-radius:12px;padding:50px 20px;text-align:center;color:#555;margin:14px 0}
 #drop.over{border-color:#08c;background:#eef8ff}
@@ -25,25 +27,18 @@ small{color:#666}
 </div>
 
 <div class="step" id="createStep">
-  <h3>Option A: Start a connection</h3>
-  <button onclick="createOffer()">Generate connect code</button>
-  <div id="offerBox" class="hidden">
-    <p>Send this code to the other device (chat, email, whatever):</p>
-    <textarea id="offerOut" readonly onclick="this.select()"></textarea>
-    <p>Then paste their reply code here and click Finish:</p>
-    <textarea id="answerIn" placeholder="paste their answer code here"></textarea>
-    <button onclick="finishConnect()">Finish connecting</button>
+  <h3>Option A: Create a room</h3>
+  <button onclick="createRoom()">Create room</button>
+  <div id="codeBox" class="hidden">
+    <p>Give this code to the other device:</p>
+    <div class="code" id="roomCode"></div>
   </div>
 </div>
 
 <div class="step" id="joinStep">
-  <h3>Option B: Join with a code someone sent you</h3>
-  <textarea id="offerIn" placeholder="paste their connect code here"></textarea>
-  <button onclick="joinOffer()">Generate reply code</button>
-  <div id="answerBox" class="hidden">
-    <p>Send this reply code back to them:</p>
-    <textarea id="answerOut" readonly onclick="this.select()"></textarea>
-  </div>
+  <h3>Option B: Join with a code</h3>
+  <input id="joinCode" maxlength="6" placeholder="123456">
+  <button onclick="joinRoom()">Connect</button>
 </div>
 
 <div id="transfer" class="step hidden">
@@ -54,122 +49,94 @@ small{color:#666}
 </div>
 
 <script>
-const CHUNK = 16 * 1024;
-let pc, dc;
+let peer, conn;
 const statusEl = document.getElementById('status');
-
 function setStatus(s) { statusEl.textContent = s; }
 
-function newPeerConnection() {
-  pc = new RTCPeerConnection({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] });
-  pc.onconnectionstatechange = () => setStatus(pc.connectionState);
-  return pc;
+function randomCode() {
+  return String(Math.floor(100000 + Math.random() * 900000));
 }
 
-function waitForIceComplete(pc) {
-  if (pc.iceGatheringState === 'complete') return Promise.resolve();
-  return new Promise(resolve => {
-    pc.onicegatheringstatechange = () => {
-      if (pc.iceGatheringState === 'complete') resolve();
-    };
+function createRoom() {
+  const code = randomCode();
+  peer = new Peer(code);
+  peer.on('open', () => {
+    document.getElementById('roomCode').textContent = code;
+    document.getElementById('codeBox').classList.remove('hidden');
+    setStatus('waiting for the other device to connect...');
+  });
+  peer.on('connection', c => { conn = c; setupConnection(); });
+  peer.on('error', err => {
+    if (err.type === 'unavailable-id') { createRoom(); } // code taken, try another
+    else setStatus('error: ' + err.type);
   });
 }
 
-function encode(desc) { return btoa(JSON.stringify(desc)); }
-function decode(str) { return JSON.parse(atob(str.trim())); }
-
-async function createOffer() {
-  newPeerConnection();
-  dc = pc.createDataChannel('files');
-  setupChannel();
-  const offer = await pc.createOffer();
-  await pc.setLocalDescription(offer);
-  await waitForIceComplete(pc);
-  document.getElementById('offerOut').value = encode(pc.localDescription);
-  document.getElementById('offerBox').classList.remove('hidden');
-  setStatus('waiting for their reply code...');
+function joinRoom() {
+  const code = document.getElementById('joinCode').value.trim();
+  if (!/^\d{4,6}$/.test(code)) { alert('enter the 4-6 digit code'); return; }
+  peer = new Peer();
+  peer.on('open', () => {
+    conn = peer.connect(code, { reliable: true });
+    setupConnection();
+  });
+  peer.on('error', err => setStatus('error: ' + err.type));
 }
 
-async function finishConnect() {
-  const answer = decode(document.getElementById('answerIn').value);
-  await pc.setRemoteDescription(answer);
-  setStatus('connecting...');
-}
-
-async function joinOffer() {
-  newPeerConnection();
-  pc.ondatachannel = e => { dc = e.channel; setupChannel(); };
-  const offer = decode(document.getElementById('offerIn').value);
-  await pc.setRemoteDescription(offer);
-  const answer = await pc.createAnswer();
-  await pc.setLocalDescription(answer);
-  await waitForIceComplete(pc);
-  document.getElementById('answerOut').value = encode(pc.localDescription);
-  document.getElementById('answerBox').classList.remove('hidden');
-  setStatus('connecting...');
-}
-
-function setupChannel() {
-  dc.binaryType = 'arraybuffer';
-  dc.onopen = () => {
+function setupConnection() {
+  conn.on('open', () => {
     setStatus('connected');
     document.getElementById('transfer').classList.remove('hidden');
-  };
-  dc.onclose = () => setStatus('disconnected');
+  });
+  conn.on('close', () => setStatus('disconnected'));
   let incoming = null;
-  dc.onmessage = async (e) => {
-    if (typeof e.data === 'string') {
-      const msg = JSON.parse(e.data);
-      if (msg.type === 'file-start') {
-        incoming = { name: msg.name, size: msg.size, received: 0, chunks: [], writer: null };
-        if (window.showSaveFilePicker) {
-          try {
-            const handle = await window.showSaveFilePicker({ suggestedName: msg.name });
-            incoming.writer = await handle.createWritable();
-          } catch (err) { incoming.writer = null; }
-        }
-      } else if (msg.type === 'file-end' && incoming) {
-        if (incoming.writer) {
-          await incoming.writer.close();
-        } else {
-          const blob = new Blob(incoming.chunks);
-          const url = URL.createObjectURL(blob);
-          const li = document.createElement('a');
-          li.href = url; li.download = incoming.name; li.textContent = incoming.name;
-          const wrap = document.createElement('li');
-          wrap.appendChild(li);
-          const list = document.getElementById('list');
-          if (list.children[0]?.textContent === '(none yet)') list.innerHTML = '';
-          list.appendChild(wrap);
-        }
-        incoming = null;
+  conn.on('data', async (data) => {
+    if (data && data.type === 'file-start') {
+      incoming = { name: data.name, size: data.size, writer: null, chunks: [] };
+      if (window.showSaveFilePicker) {
+        try {
+          const handle = await window.showSaveFilePicker({ suggestedName: data.name });
+          incoming.writer = await handle.createWritable();
+        } catch (err) { incoming.writer = null; }
       }
-    } else if (incoming) {
-      incoming.received += e.data.byteLength;
+    } else if (data && data.type === 'file-end' && incoming) {
       if (incoming.writer) {
-        await incoming.writer.write(e.data);
+        await incoming.writer.close();
       } else {
-        incoming.chunks.push(e.data);
+        const blob = new Blob(incoming.chunks);
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url; a.download = incoming.name; a.textContent = incoming.name;
+        const li = document.createElement('li');
+        li.appendChild(a);
+        const list = document.getElementById('list');
+        if (list.children[0]?.textContent === '(none yet)') list.innerHTML = '';
+        list.appendChild(li);
       }
+      incoming = null;
+    } else if (incoming && data instanceof ArrayBuffer) {
+      if (incoming.writer) await incoming.writer.write(data);
+      else incoming.chunks.push(data);
     }
-  };
+  });
 }
 
+const CHUNK = 16 * 1024;
 async function sendFile(file) {
-  dc.send(JSON.stringify({ type: 'file-start', name: file.name, size: file.size }));
+  conn.send({ type: 'file-start', name: file.name, size: file.size });
   const reader = file.stream().getReader();
   while (true) {
     const { done, value } = await reader.read();
     if (done) break;
     for (let off = 0; off < value.byteLength; off += CHUNK) {
-      const slice = value.slice(off, off + CHUNK);
-      while (dc.bufferedAmount > 8 * 1024 * 1024) {
+      const slice = value.slice(off, off + CHUNK).buffer;
+      while ((conn.dataChannel?.bufferedAmount || 0) > 8 * 1024 * 1024) {
         await new Promise(r => setTimeout(r, 20));
       }
-      dc.send(slice);
+      conn.send(slice);
     }
   }
-  dc.send(JSON.stringify({ type: 'file-end' }));
+  conn.send({ type: 'file-end' });
 }
 
 const drop = document.getElementById('drop');
