@@ -100,8 +100,7 @@ input[type=text]:focus{border-color:var(--blue)}
 <div class="wrap">
   <div class="col-left">
   <h1>Share</h1>
-  <p class="tagline">Direct device-to-device. Nothing touches a server.</p>
-  <p class="tagline" id="versionTag" style="margin-top:-16px"></p>
+  <p class="tagline">Direct device-to-device. Nothing touches a server. <span id="versionTag"></span></p>
 
   <div class="card">
     <h3>Your name</h3>
@@ -148,8 +147,8 @@ input[type=text]:focus{border-color:var(--blue)}
 </div>
 
 <script>
-const VERSION = 'v18';
-document.getElementById('versionTag').textContent = VERSION;
+const VERSION = 'v19';
+document.getElementById('versionTag').textContent = '· ' + VERSION;
 
 // A stuck old Service Worker from an earlier version of this page could
 // still be intercepting requests and breaking things. That whole approach
