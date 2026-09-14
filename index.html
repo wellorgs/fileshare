@@ -127,7 +127,7 @@ input[type=text]:focus{border-color:var(--blue)}
 </div>
 
 <script>
-const VERSION = 'v14';
+const VERSION = 'v15';
 document.getElementById('versionTag').textContent = VERSION;
 
 // A stuck old Service Worker from an earlier version of this page could
@@ -288,6 +288,14 @@ function startIncoming(name, size, fromName) {
     write: (chunk) => { chunks.push(chunk); },
     finish: async () => {
       const url = URL.createObjectURL(new Blob(chunks));
+      // The Received row's link only downloads when clicked - if nothing
+      // ever gets clicked, the file exists in the tab but never reaches
+      // disk, which reads as "it says received but I can't find it
+      // anywhere." Trigger the save automatically the moment it's ready;
+      // the row stays as a link too, for re-downloading later.
+      const a = document.createElement('a');
+      a.href = url; a.download = name;
+      document.body.appendChild(a); a.click(); a.remove();
       addReceivedRow(name, size, fromName, url);
     }
   };
