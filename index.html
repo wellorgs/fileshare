@@ -121,7 +121,10 @@ input[type=text]::placeholder{color:var(--sub)}
 }
 #drop.over{border-color:var(--blue);background:rgba(31,111,235,.06)}
 body.dragging{outline:3px dashed var(--blue);outline-offset:-3px}
-#stagingList{flex:1;overflow-y:auto;min-height:0}
+/* Natural height, capped - stays compact for a few files (the Send button
+   sits right below it, not pinned to the bottom of the page) and scrolls
+   internally instead of pushing everything else off-screen for a huge one. */
+#stagingList{flex:none;max-height:340px;overflow-y:auto;min-height:0}
 .workspace-actions{display:flex;gap:10px;align-items:center;flex-wrap:wrap;flex:none}
 .workspace-actions .btn{flex:1}
 .workspace-actions #sendBtn{flex:none}
@@ -168,7 +171,7 @@ body.dragging{outline:3px dashed var(--blue);outline-offset:-3px}
   .app{height:100vh}
   .panels{flex-direction:row;flex:1;min-height:0}
   .sidebar{width:280px;flex:none;border-bottom:none;border-right:1px solid var(--border);overflow-y:auto}
-  .workspace{flex:1;min-width:0}
+  .workspace{flex:1;min-width:0;overflow-y:auto}
   .rightpanel{width:300px;flex:none;border-top:none;border-left:1px solid var(--border)}
 }
 /* Below the breakpoint, panels stack in normal document flow with no fixed
@@ -184,7 +187,7 @@ body.dragging{outline:3px dashed var(--blue);outline-offset:-3px}
 
   <header class="topbar">
     <div class="topbar-brand">
-      <span class="brand-icon">&#8599;</span>
+      <span class="brand-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V9z"/><path d="M14 3v5h5"/><circle cx="10" cy="14.5" r="2"/><path d="M11.6 13C13 10.5 15.3 9 18 8.5"/><path d="M18 8.5l-2.4.4M18 8.5l-.9 2.2"/></svg></span>
       <h1>Share</h1><span class="tagline" id="versionTag"></span>
     </div>
     <div class="topbar-me"><span class="dot" id="topbarDot"></span><span id="topbarName"></span></div>
@@ -265,7 +268,7 @@ body.dragging{outline:3px dashed var(--blue);outline-offset:-3px}
 </div>
 
 <script>
-const VERSION = 'v27';
+const VERSION = 'v28';
 document.getElementById('versionTag').textContent = '· ' + VERSION;
 
 // A stuck old Service Worker from an earlier version of this page could
