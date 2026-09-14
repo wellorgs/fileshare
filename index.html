@@ -3,6 +3,7 @@
 <title>Share</title>
 <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <style>
 :root{
   --bg:#f2f2f7; --card:#ffffff; --text:#1c1c1e; --sub:#8a8a8e;
@@ -69,6 +70,8 @@ body.dragging{outline:3px dashed var(--blue);outline-offset:-3px}
 .filerow .name a{color:var(--text);text-decoration:none}
 .filerow .from{font-size:11px;color:var(--sub)}
 .filerow .size{font-size:12px;color:var(--sub);flex:none}
+.filerow .right{display:flex;flex-direction:column;align-items:flex-end;flex:none;gap:2px}
+.filerow .time{font-size:10px;color:var(--sub)}
 .filerow button{
   flex:none;border:none;background:none;color:var(--red);font-size:13px;
   cursor:pointer;padding:4px 6px;
@@ -148,7 +151,7 @@ body.dragging{outline:3px dashed var(--blue);outline-offset:-3px}
 </div>
 
 <script>
-const VERSION = 'v21';
+const VERSION = 'v22';
 document.getElementById('versionTag').textContent = '· ' + VERSION;
 
 // A stuck old Service Worker from an earlier version of this page could
@@ -328,6 +331,10 @@ function fmtSize(n) {
   return (n / (1024 * 1024)).toFixed(1) + ' MB';
 }
 
+function fmtTime() {
+  return new Date().toLocaleString([], { dateStyle: 'short', timeStyle: 'short' });
+}
+
 const pendingRows = new Map();
 
 function addPendingRow(name, fromName) {
@@ -371,9 +378,14 @@ function addReceivedRow(name, size, fromName, blobUrl) {
   fromEl.textContent = 'received from ' + fromName;
   meta.appendChild(nameEl); meta.appendChild(fromEl);
   row.appendChild(meta);
+  const right = document.createElement('div');
+  right.className = 'right';
   const sizeEl = document.createElement('span');
   sizeEl.className = 'size'; sizeEl.textContent = fmtSize(size);
-  row.appendChild(sizeEl);
+  const timeEl = document.createElement('span');
+  timeEl.className = 'time'; timeEl.textContent = fmtTime();
+  right.appendChild(sizeEl); right.appendChild(timeEl);
+  row.appendChild(right);
   const discard = document.createElement('button');
   discard.textContent = 'Discard';
   discard.onclick = () => { if (blobUrl) URL.revokeObjectURL(blobUrl); row.remove(); showEmptyIfNeeded(); };
@@ -407,9 +419,14 @@ function addSentRow(peerId, name, size, toName) {
   statusEl.className = 'from'; statusEl.textContent = 'sending to ' + toName + '...';
   meta.appendChild(nameEl); meta.appendChild(statusEl);
   row.appendChild(meta);
+  const right = document.createElement('div');
+  right.className = 'right';
   const sizeEl = document.createElement('span');
   sizeEl.className = 'size'; sizeEl.textContent = fmtSize(size);
-  row.appendChild(sizeEl);
+  const timeEl = document.createElement('span');
+  timeEl.className = 'time'; timeEl.textContent = fmtTime();
+  right.appendChild(sizeEl); right.appendChild(timeEl);
+  row.appendChild(right);
   list.prepend(row);
   sentRows.set(peerId + '|' + name, { row, statusEl, toName });
 }
@@ -454,11 +471,50 @@ async function sendFileTo(conn, file, toName) {
   markSent(conn.peer, path);
 }
 
+// A browser can only ever trigger individual file downloads - there's no
+// way for a webpage to write an actual folder to the receiver's disk in
+// one action. Sending a folder's files individually means the receiver
+// gets N separate downloads instead of "the folder". Zipping the folder
+// into one file before sending is the only way to deliver it as a single
+// download; the receiver extracts it locally to get the folder back.
+async function zipFolder(folderName, files) {
+  const zip = new JSZip();
+  for (const f of files) {
+    zip.file(f.webkitRelativePath.slice(folderName.length + 1), f);
+  }
+  const blob = await zip.generateAsync({ type: 'blob' });
+  return new File([blob], folderName + '.zip');
+}
+
 async function sendFiles(fileList) {
   const targets = [...conns.values()].filter(e => e.conn.open);
   if (!targets.length) { alert('not connected yet'); return; }
   const drop = document.getElementById('drop');
-  for (const file of fileList) {
+
+  const loose = [];
+  const folders = new Map(); // top-level folder name -> its files
+  for (const f of fileList) {
+    const rel = f.webkitRelativePath;
+    if (rel && rel.includes('/')) {
+      const top = rel.split('/')[0];
+      if (!folders.has(top)) folders.set(top, []);
+      folders.get(top).push(f);
+    } else {
+      loose.push(f);
+    }
+  }
+
+  const toSend = [...loose];
+  for (const [folderName, files] of folders) {
+    drop.textContent = 'zipping ' + folderName + '...';
+    try {
+      toSend.push(await zipFolder(folderName, files));
+    } catch (err) {
+      alert("Couldn't zip " + folderName + ': ' + err.message);
+    }
+  }
+
+  for (const file of toSend) {
     drop.textContent = 'sending ' + (file.webkitRelativePath || file.name) + '...';
     try {
       for (const { conn, name } of targets) await sendFileTo(conn, file, name);
