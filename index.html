@@ -39,6 +39,7 @@ input[type=text]:focus{border-color:var(--blue)}
 .btn-secondary{background:var(--border);color:var(--text)}
 .row{display:flex;gap:10px}
 .row input{flex:1}
+.row .btn{flex:1;width:auto}
 .code{font-size:34px;font-weight:700;letter-spacing:6px;text-align:center;
   padding:4px 0 12px;color:var(--blue)}
 #qrbox{display:flex;justify-content:center;padding:8px 0 4px}
@@ -73,9 +74,27 @@ input[type=text]:focus{border-color:var(--blue)}
 }
 .empty{color:var(--sub);font-size:13px;text-align:center;padding:8px 0}
 .hidden{display:none !important}
+.badge{width:22px;height:22px;border-radius:50%;flex:none;color:#fff;font-size:12px;
+  display:flex;align-items:center;justify-content:center;font-weight:700}
+.badge.in{background:var(--green)}
+.badge.out{background:var(--blue)}
+
+/* Desktop: use the full viewport, no page-level scroll - name/room setup
+   on the left, send + activity feed on the right (activity scrolls
+   within its own card instead of growing the page). */
+@media (min-width:900px){
+  body{height:100vh;overflow:hidden;padding:28px 40px;display:flex;flex-direction:column}
+  .wrap{max-width:1400px;width:100%;margin:0 auto;flex:1;min-height:0;
+    display:grid;grid-template-columns:380px 1fr;gap:24px}
+  .col-left{overflow-y:auto;padding-right:4px}
+  .col-right{display:flex;flex-direction:column;min-height:0}
+  .activity-card{flex:1;display:flex;flex-direction:column;min-height:0}
+  .activity-card #list{overflow-y:auto;flex:1}
+}
 </style></head>
 <body>
 <div class="wrap">
+  <div class="col-left">
   <h1>Share</h1>
   <p class="tagline">Direct device-to-device. Nothing touches a server.</p>
   <p class="tagline" id="versionTag" style="margin-top:-16px"></p>
@@ -108,26 +127,24 @@ input[type=text]:focus{border-color:var(--blue)}
     </div>
   </div>
 
-  <div id="transfer" class="hidden">
+  </div>
+
+  <div id="transfer" class="hidden col-right">
     <div class="card">
       <h3>Send</h3>
-      <div id="drop">Drag files here, or</div>
-      <button class="btn btn-secondary" onclick="document.getElementById('fileInput').click()">+ Add file</button>
+      <div id="drop">Drag files or folders here, or</div>
+      <button class="btn btn-secondary" onclick="document.getElementById('fileInput').click()">+ Add file/folder</button>
       <input type="file" id="fileInput" multiple class="hidden">
     </div>
-    <div class="card">
-      <h3>Sent</h3>
-      <div id="sentList"><div class="empty">nothing yet</div></div>
-    </div>
-    <div class="card">
-      <h3>Received</h3>
+    <div class="card activity-card">
+      <h3>Activity</h3>
       <div id="list"><div class="empty">nothing yet</div></div>
     </div>
   </div>
 </div>
 
 <script>
-const VERSION = 'v15';
+const VERSION = 'v16';
 document.getElementById('versionTag').textContent = VERSION;
 
 // A stuck old Service Worker from an earlier version of this page could
@@ -331,6 +348,9 @@ function addReceivedRow(name, size, fromName, blobUrl) {
   const row = existing || document.createElement('div');
   row.className = 'filerow';
   row.innerHTML = '';
+  const badge = document.createElement('span');
+  badge.className = 'badge in'; badge.textContent = '↓';
+  row.appendChild(badge);
   const meta = document.createElement('div');
   meta.className = 'meta';
   const nameEl = document.createElement('div');
@@ -344,7 +364,7 @@ function addReceivedRow(name, size, fromName, blobUrl) {
   }
   const fromEl = document.createElement('div');
   fromEl.className = 'from';
-  fromEl.textContent = 'from ' + fromName;
+  fromEl.textContent = 'received from ' + fromName;
   meta.appendChild(nameEl); meta.appendChild(fromEl);
   row.appendChild(meta);
   const sizeEl = document.createElement('span');
@@ -354,7 +374,7 @@ function addReceivedRow(name, size, fromName, blobUrl) {
   discard.textContent = 'Discard';
   discard.onclick = () => { if (blobUrl) URL.revokeObjectURL(blobUrl); row.remove(); showEmptyIfNeeded(); };
   row.appendChild(discard);
-  if (!existing) list.appendChild(row);
+  if (!existing) list.prepend(row);
 }
 
 function showEmptyIfNeeded() {
@@ -362,15 +382,19 @@ function showEmptyIfNeeded() {
   if (!list.children.length) list.innerHTML = '<div class="empty">nothing yet</div>';
 }
 
-// ---- sent list: shows Sending -> Sent -> Delivered per (peer, file) ----
+// ---- sent tracking: shows sending -> sent -> delivered per (peer, file),
+// in the same single activity list as received files ----
 
 const sentRows = new Map(); // peerId|name -> { row, statusEl }
 
 function addSentRow(peerId, name, size, toName) {
-  const list = document.getElementById('sentList');
+  const list = document.getElementById('list');
   if (list.querySelector('.empty')) list.innerHTML = '';
   const row = document.createElement('div');
   row.className = 'filerow';
+  const badge = document.createElement('span');
+  badge.className = 'badge out'; badge.textContent = '↑';
+  row.appendChild(badge);
   const meta = document.createElement('div');
   meta.className = 'meta';
   const nameEl = document.createElement('div');
@@ -382,7 +406,7 @@ function addSentRow(peerId, name, size, toName) {
   const sizeEl = document.createElement('span');
   sizeEl.className = 'size'; sizeEl.textContent = fmtSize(size);
   row.appendChild(sizeEl);
-  list.appendChild(row);
+  list.prepend(row);
   sentRows.set(peerId + '|' + name, { row, statusEl, toName });
 }
 
@@ -399,10 +423,17 @@ function markDelivered(peerId, name) {
 // ---- sending ----
 
 const CHUNK = 16 * 1024;
+// A folder's files carry their relative path (from webkitdirectory input,
+// or from the drag-drop directory walk below) in .webkitRelativePath -
+// that path is used as the transferred "name" throughout, so the receiver
+// naturally shows "MyFolder/photo.jpg" and Chrome recreates the subfolder
+// under Downloads on save (a "/" in a download's suggested filename does
+// that automatically - no directory-picker or extra protocol needed).
 async function sendFileTo(conn, file, toName) {
   const dc = conn.dataChannel;
-  addSentRow(conn.peer, file.name, file.size, toName);
-  dc.send(JSON.stringify({ type: 'file-start', name: file.name, size: file.size }));
+  const path = file.webkitRelativePath || file.name;
+  addSentRow(conn.peer, path, file.size, toName);
+  dc.send(JSON.stringify({ type: 'file-start', name: path, size: file.size }));
   const reader = file.stream().getReader();
   while (true) {
     const { done, value } = await reader.read();
@@ -416,7 +447,7 @@ async function sendFileTo(conn, file, toName) {
     }
   }
   dc.send(JSON.stringify({ type: 'file-end' }));
-  markSent(conn.peer, file.name);
+  markSent(conn.peer, path);
 }
 
 async function sendFiles(fileList) {
@@ -424,7 +455,7 @@ async function sendFiles(fileList) {
   if (!targets.length) { alert('not connected yet'); return; }
   const drop = document.getElementById('drop');
   for (const file of fileList) {
-    drop.textContent = 'sending ' + file.name + '...';
+    drop.textContent = 'sending ' + (file.webkitRelativePath || file.name) + '...';
     try {
       for (const { conn, name } of targets) await sendFileTo(conn, file, name);
     } catch (err) {
@@ -432,7 +463,45 @@ async function sendFiles(fileList) {
       break;
     }
   }
-  drop.textContent = 'Drag files here, or';
+  drop.textContent = 'Drag files or folders here, or';
+}
+
+// Plain drag-drop only gives top-level dropped items; a dropped folder's
+// contents need walking its DataTransferItem entry tree explicitly.
+function readEntry(entry, prefix) {
+  return new Promise(resolve => {
+    if (entry.isFile) {
+      entry.file(file => {
+        try {
+          Object.defineProperty(file, 'webkitRelativePath', { value: prefix + file.name });
+        } catch (err) { /* ignore, falls back to plain file.name */ }
+        resolve([file]);
+      });
+    } else if (entry.isDirectory) {
+      const reader = entry.createReader();
+      const all = [];
+      const readBatch = () => reader.readEntries(async (batch) => {
+        if (!batch.length) {
+          const nested = await Promise.all(all.map(en => readEntry(en, prefix + entry.name + '/')));
+          resolve(nested.flat());
+        } else {
+          all.push(...batch);
+          readBatch();
+        }
+      });
+      readBatch();
+    } else {
+      resolve([]);
+    }
+  });
+}
+
+async function filesFromDrop(dataTransfer) {
+  const items = dataTransfer.items;
+  if (!items || !items.length || !items[0].webkitGetAsEntry) return [...dataTransfer.files];
+  const entries = [...items].map(i => i.webkitGetAsEntry()).filter(Boolean);
+  const nested = await Promise.all(entries.map(e => readEntry(e, '')));
+  return nested.flat();
 }
 
 const drop = document.getElementById('drop');
@@ -442,7 +511,7 @@ const drop = document.getElementById('drop');
 ['dragleave', 'drop'].forEach(ev => drop.addEventListener(ev, e => {
   e.preventDefault(); drop.classList.remove('over');
 }));
-drop.addEventListener('drop', e => sendFiles(e.dataTransfer.files));
+drop.addEventListener('drop', async e => sendFiles(await filesFromDrop(e.dataTransfer)));
 
 document.getElementById('fileInput').addEventListener('change', e => {
   sendFiles(e.target.files);
