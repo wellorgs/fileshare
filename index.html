@@ -50,17 +50,29 @@ input[type=text]::placeholder{color:var(--sub)}
 .dot{width:6px;height:6px;border-radius:50%;background:var(--sub);flex:none}
 .dot.live{background:var(--green)}
 .dot.pending{background:var(--orange)}
+.dot.busy{background:var(--orange)}
 .dot.err{background:var(--red)}
 .hidden{display:none !important}
 
-/* ---- app shell: sidebar / workspace / queue+history ---- */
+/* ---- app shell: top bar + sidebar / workspace / queue+history ---- */
 .app{display:flex;flex-direction:column;min-height:100vh}
+.topbar{display:flex;align-items:center;justify-content:space-between;padding:10px 16px;
+  background:var(--panel);border-bottom:1px solid var(--border);flex:none}
+.topbar-brand{display:flex;align-items:center;gap:8px}
+.brand-icon{width:22px;height:22px;border-radius:5px;background:var(--blue);flex:none;
+  display:flex;align-items:center;justify-content:center;color:#fff}
+.topbar .tagline{margin:0}
+.topbar-me{display:flex;align-items:center;gap:7px;font-family:var(--font-mono);font-size:11px;color:var(--sub)}
+.panels{display:flex;flex-direction:column;flex:1;min-height:0}
 .sidebar,.rightpanel{padding:16px;display:flex;flex-direction:column;gap:12px}
 .sidebar{background:var(--panel);border-bottom:1px solid var(--border)}
 .rightpanel{background:var(--panel);border-top:1px solid var(--border)}
 .workspace{padding:16px;display:flex;flex-direction:column;gap:12px;flex:1}
 .section{background:var(--card);border-radius:8px;padding:12px;border:1px solid var(--border)}
 .brand{display:flex;align-items:baseline;gap:8px;margin-bottom:2px}
+.device-icon{width:26px;height:26px;border-radius:6px;background:var(--panel);border:1px solid var(--border);
+  flex:none;display:flex;align-items:center;justify-content:center;color:var(--sub)}
+.target-header .device-icon{width:30px;height:30px}
 
 .devices-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
 .devices-head h3{margin:0}
@@ -88,6 +100,16 @@ input[type=text]::placeholder{color:var(--sub)}
 .target-header .meta{flex:1;overflow:hidden}
 .target-header .name{font-size:14px;font-weight:600;font-family:var(--font-mono)}
 .target-header .sub{font-size:11px;color:var(--sub);font-family:var(--font-mono);margin-top:2px}
+.busy-pill{margin-left:auto;flex:none;background:rgba(255,166,87,.12);color:var(--orange);
+  font-size:10px;font-weight:500;font-family:var(--font-mono);padding:4px 8px;border-radius:5px;
+  border:1px solid rgba(255,166,87,.3)}
+
+.queue-head{display:flex;align-items:center;justify-content:space-between;
+  font-size:10px;color:var(--sub);text-transform:uppercase;letter-spacing:1px;
+  font-family:var(--font-sans);padding-bottom:8px;margin-bottom:2px;border-bottom:1px solid var(--border)}
+.queue-head a{color:var(--blue);text-decoration:none;text-transform:none;letter-spacing:normal;font-size:11px;cursor:pointer}
+.file-icon{width:20px;height:20px;flex:none;color:var(--sub);display:flex;align-items:center;justify-content:center}
+.send-total{font-size:11px;color:var(--sub);font-family:var(--font-mono);white-space:nowrap}
 
 #drop{
   border:2px dashed var(--border);border-radius:8px;padding:14px 16px;text-align:center;
@@ -96,8 +118,9 @@ input[type=text]::placeholder{color:var(--sub)}
 }
 #drop.over{border-color:var(--blue);background:rgba(31,111,235,.06)}
 body.dragging{outline:3px dashed var(--blue);outline-offset:-3px}
-.workspace-actions{display:flex;gap:10px}
+.workspace-actions{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
 .workspace-actions .btn{flex:1}
+.workspace-actions #sendBtn{flex:none}
 
 .tabs{display:flex;gap:4px;background:transparent;border-bottom:1px solid var(--border);padding:0}
 .tab{flex:1;border:none;background:none;padding:10px 0;border-radius:0;font-size:11px;
@@ -105,8 +128,20 @@ body.dragging{outline:3px dashed var(--blue);outline-offset:-3px}
   border-bottom:2px solid transparent;margin-bottom:-1px}
 .tab.active{color:var(--text);border-bottom-color:var(--blue)}
 .tabpanel{flex:1;overflow-y:auto;min-height:0}
+.tab-badge{display:inline-block;background:var(--blue);color:#fff;font-size:9px;font-weight:600;
+  border-radius:8px;padding:1px 5px;margin-left:3px;font-family:var(--font-mono)}
 
-.filerow{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border)}
+.filerow .progress{height:3px;background:var(--border);border-radius:2px;margin-top:6px;overflow:hidden}
+.filerow .progress-bar{height:100%;background:var(--blue);border-radius:2px;transition:width .15s}
+.status-icon{flex:none;width:16px;height:16px;display:flex;align-items:center;justify-content:center}
+.status-icon.spin{animation:spin 1s linear infinite;color:var(--blue)}
+.status-icon.wait{color:var(--sub)}
+.status-icon.ok{color:var(--green)}
+.status-icon.fail{color:var(--red)}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+.filerow{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border);flex-wrap:wrap}
+.filerow .progress{flex-basis:100%}
 .filerow:last-child{border-bottom:none}
 .filerow .meta{flex:1;overflow:hidden}
 .filerow .name{font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-family:var(--font-mono)}
@@ -126,7 +161,8 @@ body.dragging{outline:3px dashed var(--blue);outline-offset:-3px}
    scroll - each column scrolls internally if its content overflows. */
 @media (min-width:900px){
   body{height:100vh;overflow:hidden}
-  .app{flex-direction:row;height:100vh}
+  .app{height:100vh}
+  .panels{flex-direction:row;flex:1;min-height:0}
   .sidebar{width:280px;flex:none;border-bottom:none;border-right:1px solid var(--border);overflow-y:auto}
   .workspace{flex:1;min-width:0}
   .rightpanel{width:300px;flex:none;border-top:none;border-left:1px solid var(--border)}
@@ -142,8 +178,17 @@ body.dragging{outline:3px dashed var(--blue);outline-offset:-3px}
 <body>
 <div class="app">
 
+  <header class="topbar">
+    <div class="topbar-brand">
+      <span class="brand-icon">&#8599;</span>
+      <h1>Share</h1><span class="tagline" id="versionTag"></span>
+    </div>
+    <div class="topbar-me"><span class="dot" id="topbarDot"></span><span id="topbarName"></span></div>
+  </header>
+
+  <div class="panels">
+
   <aside class="sidebar">
-    <div class="brand"><h1>Share</h1><span class="tagline" id="versionTag"></span></div>
     <p class="tagline" style="margin-bottom:4px">Direct device-to-device. Nothing touches a server.</p>
 
     <div class="section">
@@ -186,33 +231,36 @@ body.dragging{outline:3px dashed var(--blue);outline-offset:-3px}
 
   <main class="workspace">
     <div id="targetHeader" class="section target-header hidden">
-      <span class="avatar" id="targetAvatar"></span>
+      <span class="device-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg></span>
       <div class="meta">
         <div class="name" id="targetName"></div>
         <div class="sub" id="targetSub"></div>
       </div>
+      <span class="busy-pill hidden" id="targetBusyPill">busy &mdash; may be slower</span>
     </div>
     <div id="drop">Drag files or folders anywhere on this page, or use + Add file/folder below</div>
     <input type="file" id="fileInput" multiple class="hidden">
     <div class="workspace-actions">
       <button class="btn btn-secondary" onclick="document.getElementById('fileInput').click()">+ Add file/folder</button>
       <button class="btn btn-primary" id="sendBtn" disabled>Send files</button>
+      <span class="send-total hidden" id="sendTotal"></span>
     </div>
   </main>
 
   <aside class="rightpanel">
     <div class="tabs">
-      <button class="tab active" id="queueTab" onclick="switchTab('queue')">Queue</button>
-      <button class="tab" id="historyTab" onclick="switchTab('history')">History</button>
+      <button class="tab active" id="queueTab" onclick="switchTab('queue')">Queue <span class="tab-badge hidden" id="queueBadge"></span></button>
+      <button class="tab" id="historyTab" onclick="switchTab('history')">History <span class="tab-badge hidden" id="historyBadge"></span></button>
     </div>
     <div id="queueList" class="tabpanel"><div class="empty">No files queued. Add files and hit Send.</div></div>
     <div id="historyList" class="tabpanel hidden"><div class="empty">nothing yet</div></div>
   </aside>
 
+  </div>
 </div>
 
 <script>
-const VERSION = 'v25';
+const VERSION = 'v26';
 document.getElementById('versionTag').textContent = '· ' + VERSION;
 
 // A stuck old Service Worker from an earlier version of this page could
@@ -233,21 +281,35 @@ function detectOS() {
 }
 const MY_OS = detectOS();
 
+const ICON = {
+  monitor: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>',
+  file: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>',
+  spinner: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>',
+  clock: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>',
+  check: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="8 12 11 15 16 9"/></svg>',
+  fail: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>',
+};
+
 let peer;
-const conns = new Map(); // conn.peer -> { conn, name, os }
+const conns = new Map(); // conn.peer -> { conn, name, os, busy }
 let selectedPeer = null; // peerId of the device files will be sent to
 const statusEl = document.getElementById('status');
 const dotEl = document.getElementById('dot');
 const nameInput = document.getElementById('myName');
 nameInput.value = localStorage.getItem('shareName') || '';
-nameInput.addEventListener('input', () => localStorage.setItem('shareName', nameInput.value));
+nameInput.addEventListener('input', () => { localStorage.setItem('shareName', nameInput.value); renderTopbarMe(); });
 
 function myName() { return nameInput.value.trim() || 'a device'; }
-function initials(n) { return n.trim().split(/\s+/).slice(0, 2).map(w => w[0]).join('').toUpperCase() || '?'; }
 function setStatus(s, dotClass) {
   statusEl.textContent = s;
   dotEl.className = 'dot' + (dotClass ? ' ' + dotClass : '');
 }
+function renderTopbarMe() {
+  document.getElementById('topbarName').textContent = myName();
+  document.getElementById('topbarDot').className = 'dot live';
+}
+renderTopbarMe();
+
 // A device row is click-to-select: exactly one connected device is the
 // active send target at a time (matches the reference design), rather than
 // broadcasting to everyone connected.
@@ -262,14 +324,15 @@ function renderPeerList() {
   const matches = [...conns.entries()].filter(([, { name }]) => name.toLowerCase().includes(filter));
   if (!matches.length) { box.innerHTML = '<div class="empty">no devices match</div>'; renderTargetHeader(); updateSendButton(); return; }
   box.innerHTML = '';
-  for (const [peerId, { name, os }] of matches) {
+  for (const [peerId, { name, os, busy }] of matches) {
     const selected = peerId === selectedPeer;
     const row = document.createElement('div');
     row.className = 'device-row' + (selected ? ' selected' : '');
     row.innerHTML =
-      `<span class="dot live"></span>` +
+      `<span class="device-icon">${ICON.monitor}</span>` +
       `<div class="device-meta"><div class="device-name">${name}</div>` +
-      `<div class="device-sub"><span class="os-badge">${os || '?'}</span>connected</div></div>` +
+      `<div class="device-sub"><span class="os-badge">${os || '?'}</span>${busy ? 'busy' : 'connected'}</div></div>` +
+      `<span class="dot ${busy ? 'busy' : 'live'}"></span>` +
       (selected ? '<span class="chevron">&#8250;</span>' : '');
     row.onclick = () => { selectedPeer = peerId; renderPeerList(); };
     box.appendChild(row);
@@ -290,9 +353,9 @@ function renderTargetHeader() {
   const entry = selectedPeer && conns.get(selectedPeer);
   if (!entry) { header.classList.add('hidden'); return; }
   header.classList.remove('hidden');
-  document.getElementById('targetAvatar').textContent = initials(entry.name);
   document.getElementById('targetName').textContent = entry.name;
-  document.getElementById('targetSub').textContent = (entry.os || '?') + ' · connected';
+  document.getElementById('targetSub').textContent = (entry.os || '?') + ' · ' + (entry.busy ? 'busy' : 'connected');
+  document.getElementById('targetBusyPill').classList.toggle('hidden', !entry.busy);
 }
 
 const ICE_CONFIG = {
@@ -375,12 +438,16 @@ function addConn(conn) {
             entry.os = msg.os;
             renderPeerList();
           } else if (msg.type === 'file-start') {
+            entry.busy = true;
+            renderPeerList();
             addPendingRow(msg.name, entry.name);
             conn._incoming = startIncoming(msg.name, msg.size, entry.name);
           } else if (msg.type === 'file-end' && conn._incoming) {
             await conn._incoming.finish();
             dc.send(JSON.stringify({ type: 'delivered', name: conn._incoming.name }));
             conn._incoming = null;
+            entry.busy = false;
+            renderPeerList();
           } else if (msg.type === 'delivered') {
             markDelivered(conn.peer, msg.name);
           }
@@ -463,6 +530,7 @@ function addPendingRow(name, fromName) {
   row.appendChild(meta);
   list.prepend(row);
   pendingRows.set(fromName + '|' + name, row);
+  updateTabBadges();
 }
 
 function addReceivedRow(name, size, fromName, blobUrl) {
@@ -503,9 +571,10 @@ function addReceivedRow(name, size, fromName, blobUrl) {
   row.appendChild(right);
   const discard = document.createElement('button');
   discard.textContent = 'Discard';
-  discard.onclick = () => { if (blobUrl) URL.revokeObjectURL(blobUrl); row.remove(); showHistoryEmptyIfNeeded(); };
+  discard.onclick = () => { if (blobUrl) URL.revokeObjectURL(blobUrl); row.remove(); showHistoryEmptyIfNeeded(); updateTabBadges(); };
   row.appendChild(discard);
   if (!existing) list.prepend(row);
+  updateTabBadges();
 }
 
 function showHistoryEmptyIfNeeded() {
@@ -513,44 +582,83 @@ function showHistoryEmptyIfNeeded() {
   if (!list.children.length) list.innerHTML = '<div class="empty">nothing yet</div>';
 }
 
-const sentRows = new Map(); // peerId|name -> { row, statusEl }
+const sentRows = new Map(); // peerId|name -> { row, statusEl, iconEl, barEl, toName }
 
+// A row starts as "waiting" (clock icon, empty bar) the moment Send is
+// clicked, before its turn in the sequential send loop - matches the
+// reference design, where every queued item is visible immediately instead
+// of appearing one at a time.
 function addSentRow(peerId, name, size, toName) {
   const list = document.getElementById('historyList');
   if (list.querySelector('.empty')) list.innerHTML = '';
   const row = document.createElement('div');
   row.className = 'filerow';
-  const badge = document.createElement('span');
-  badge.className = 'badge out'; badge.textContent = '↑';
-  row.appendChild(badge);
-  const meta = document.createElement('div');
-  meta.className = 'meta';
-  const nameEl = document.createElement('div');
-  nameEl.className = 'name'; nameEl.textContent = name;
-  const statusEl = document.createElement('div');
-  statusEl.className = 'from'; statusEl.textContent = 'sending to ' + toName + '...';
-  meta.appendChild(nameEl); meta.appendChild(statusEl);
-  row.appendChild(meta);
-  const right = document.createElement('div');
-  right.className = 'right';
-  const sizeEl = document.createElement('span');
-  sizeEl.className = 'size'; sizeEl.textContent = fmtSize(size);
-  const timeEl = document.createElement('span');
-  timeEl.className = 'time'; timeEl.textContent = fmtTime();
-  right.appendChild(sizeEl); right.appendChild(timeEl);
-  row.appendChild(right);
+  row.innerHTML =
+    `<span class="file-icon">${ICON.file}</span>` +
+    `<div class="meta"><div class="name">${name}</div>` +
+    `<div class="from">&rarr; ${toName} &middot; ${fmtSize(size)}</div></div>` +
+    `<span class="status-icon wait">${ICON.clock}</span>` +
+    `<div class="progress"><div class="progress-bar" style="width:0%"></div></div>`;
   list.prepend(row);
-  sentRows.set(peerId + '|' + name, { row, statusEl, toName });
+  const entry = {
+    row, toName,
+    statusEl: row.querySelector('.from'),
+    iconEl: row.querySelector('.status-icon'),
+    barEl: row.querySelector('.progress-bar'),
+  };
+  sentRows.set(peerId + '|' + name, entry);
+  updateTabBadges();
+  return entry;
+}
+
+function markSending(peerId, name) {
+  const entry = sentRows.get(peerId + '|' + name);
+  if (!entry) return;
+  entry.iconEl.className = 'status-icon spin';
+  entry.iconEl.innerHTML = ICON.spinner;
+  entry.statusEl.textContent = 'sending to ' + entry.toName + '...';
+}
+
+function markProgress(peerId, name, fraction) {
+  const entry = sentRows.get(peerId + '|' + name);
+  if (entry) entry.barEl.style.width = Math.round(fraction * 100) + '%';
 }
 
 function markSent(peerId, name) {
   const entry = sentRows.get(peerId + '|' + name);
-  if (entry) entry.statusEl.textContent = 'sent to ' + entry.toName + ', waiting for confirmation...';
+  if (!entry) return;
+  entry.barEl.style.width = '100%';
+  entry.iconEl.className = 'status-icon wait';
+  entry.iconEl.innerHTML = ICON.clock;
+  entry.statusEl.textContent = 'sent to ' + entry.toName + ', waiting for confirmation...';
 }
 
 function markDelivered(peerId, name) {
   const entry = sentRows.get(peerId + '|' + name);
-  if (entry) entry.statusEl.innerHTML = '✓ delivered to ' + entry.toName;
+  if (!entry) return;
+  entry.row.querySelector('.progress').remove();
+  entry.iconEl.className = 'status-icon ok';
+  entry.iconEl.innerHTML = ICON.check;
+  entry.statusEl.textContent = 'delivered to ' + entry.toName;
+}
+
+function markFailed(peerId, name, reason) {
+  const entry = sentRows.get(peerId + '|' + name);
+  if (!entry) return;
+  entry.row.querySelector('.progress').remove();
+  entry.iconEl.className = 'status-icon fail';
+  entry.iconEl.innerHTML = ICON.fail;
+  entry.statusEl.textContent = 'failed to send to ' + entry.toName + (reason ? ': ' + reason : '');
+}
+
+function updateTabBadges() {
+  const queueBadge = document.getElementById('queueBadge');
+  const historyBadge = document.getElementById('historyBadge');
+  queueBadge.textContent = queue.length;
+  queueBadge.classList.toggle('hidden', !queue.length);
+  const historyCount = document.getElementById('historyList').querySelectorAll('.filerow').length;
+  historyBadge.textContent = historyCount;
+  historyBadge.classList.toggle('hidden', !historyCount);
 }
 
 // ---- queue: files staged before sending ----
@@ -559,18 +667,20 @@ let queue = []; // array of File (folders already zipped into one File each)
 
 function renderQueue() {
   const list = document.getElementById('queueList');
-  if (!queue.length) { list.innerHTML = '<div class="empty">No files queued. Add files and hit Send.</div>'; updateSendButton(); return; }
+  if (!queue.length) { list.innerHTML = '<div class="empty">No files queued. Add files and hit Send.</div>'; updateSendButton(); updateTabBadges(); return; }
   list.innerHTML = '';
+  const head = document.createElement('div');
+  head.className = 'queue-head';
+  head.innerHTML = `<span>${queue.length} file${queue.length > 1 ? 's' : ''} selected</span><a>Clear all</a>`;
+  head.querySelector('a').onclick = () => { queue = []; renderQueue(); };
+  list.appendChild(head);
   queue.forEach((file, i) => {
     const row = document.createElement('div');
     row.className = 'filerow';
-    const meta = document.createElement('div');
-    meta.className = 'meta';
-    meta.innerHTML = `<div class="name">${file.name}</div><div class="from">queued</div>`;
-    row.appendChild(meta);
-    const sizeEl = document.createElement('span');
-    sizeEl.className = 'size'; sizeEl.textContent = fmtSize(file.size);
-    row.appendChild(sizeEl);
+    row.innerHTML =
+      `<span class="file-icon">${ICON.file}</span>` +
+      `<div class="meta"><div class="name">${file.name}</div>` +
+      `<div class="from">${fmtSize(file.size)} &middot; ${file.type || 'application/octet-stream'}</div></div>`;
     const remove = document.createElement('button');
     remove.textContent = 'Remove';
     remove.onclick = () => { queue.splice(i, 1); renderQueue(); };
@@ -578,11 +688,22 @@ function renderQueue() {
     list.appendChild(row);
   });
   updateSendButton();
+  updateTabBadges();
 }
 
 function updateSendButton() {
   const target = selectedPeer && conns.get(selectedPeer);
-  document.getElementById('sendBtn').disabled = !queue.length || !target || !target.conn.open;
+  const btn = document.getElementById('sendBtn');
+  const totalEl = document.getElementById('sendTotal');
+  btn.disabled = !queue.length || !target || !target.conn.open;
+  if (queue.length && target) {
+    btn.textContent = `Send ${queue.length} file${queue.length > 1 ? 's' : ''} → ${target.name}`;
+    totalEl.textContent = fmtSize(queue.reduce((n, f) => n + f.size, 0)) + ' total';
+    totalEl.classList.remove('hidden');
+  } else {
+    btn.textContent = 'Send files';
+    totalEl.classList.add('hidden');
+  }
 }
 
 // ---- preparing dropped/picked items: folders get zipped into one file ----
@@ -644,9 +765,10 @@ const CHUNK = 16 * 1024;
 async function sendFileTo(conn, file, toName) {
   const dc = conn.dataChannel;
   const path = file.webkitRelativePath || file.name;
-  addSentRow(conn.peer, path, file.size, toName);
+  markSending(conn.peer, path);
   dc.send(JSON.stringify({ type: 'file-start', name: path, size: file.size }));
   const reader = file.stream().getReader();
+  let sent = 0;
   while (true) {
     const { done, value } = await reader.read();
     if (done) break;
@@ -656,6 +778,8 @@ async function sendFileTo(conn, file, toName) {
         await new Promise(r => setTimeout(r, 20));
       }
       dc.send(slice);
+      sent += slice.byteLength;
+      markProgress(conn.peer, path, file.size ? sent / file.size : 1);
     }
   }
   dc.send(JSON.stringify({ type: 'file-end' }));
@@ -670,13 +794,21 @@ document.getElementById('sendBtn').addEventListener('click', async () => {
   queue = [];
   renderQueue();
   switchTab('history');
+  // Every queued file gets a row immediately (clock icon, matching the
+  // reference design) instead of appearing one at a time as its turn comes.
+  for (const file of toSend) addSentRow(target.conn.peer, file.webkitRelativePath || file.name, file.size, target.name);
+  target.busy = true;
+  renderPeerList();
   for (const file of toSend) {
+    const path = file.webkitRelativePath || file.name;
     try {
       await sendFileTo(target.conn, file, target.name);
     } catch (err) {
-      alert('send failed: ' + err.message);
+      markFailed(target.conn.peer, path, err.message);
     }
   }
+  target.busy = false;
+  renderPeerList();
 });
 
 // Plain drag-drop only gives top-level dropped items; a dropped folder's
