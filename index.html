@@ -79,15 +79,17 @@ input[type=text]:focus{border-color:var(--blue)}
 .badge.in{background:var(--green)}
 .badge.out{background:var(--blue)}
 
-/* Desktop: use the full viewport, no page-level scroll - name/room setup
-   on the left, send + activity feed on the right (activity scrolls
-   within its own card instead of growing the page). */
+/* Desktop/laptop: same single centered column as mobile (a two-column
+   split left an empty void on the right before connecting), just capped
+   to the viewport height so the page itself never scrolls - only the
+   Activity feed scrolls within its own card as it fills up. */
 @media (min-width:900px){
-  body{height:100vh;overflow:hidden;padding:28px 40px;display:flex;flex-direction:column}
-  .wrap{max-width:1400px;width:100%;margin:0 auto;flex:1;min-height:0;
-    display:grid;grid-template-columns:380px 1fr;gap:24px}
-  .col-left{overflow-y:auto;padding-right:4px}
-  .col-right{display:flex;flex-direction:column;min-height:0}
+  body{height:100vh;overflow:hidden;padding:28px 16px;display:flex;flex-direction:column}
+  .wrap{max-width:480px;width:100%;margin:0 auto;flex:1;min-height:0;
+    display:flex;flex-direction:column}
+  h1{font-size:26px}
+  .col-left{flex:none}
+  #transfer.col-right{display:flex;flex-direction:column;flex:1;min-height:0}
   .activity-card{flex:1;display:flex;flex-direction:column;min-height:0}
   .activity-card #list{overflow-y:auto;flex:1}
 }
@@ -144,7 +146,7 @@ input[type=text]:focus{border-color:var(--blue)}
 </div>
 
 <script>
-const VERSION = 'v16';
+const VERSION = 'v17';
 document.getElementById('versionTag').textContent = VERSION;
 
 // A stuck old Service Worker from an earlier version of this page could
