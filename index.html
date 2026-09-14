@@ -24,15 +24,15 @@ h1{font-size:13px;font-weight:600;margin:0;font-family:var(--font-mono);letter-s
 .tagline{color:var(--sub);font-size:10px;margin:2px 0 0;font-family:var(--font-mono)}
 h3{margin:0 0 10px;font-size:10px;font-weight:500;color:var(--sub);
   text-transform:uppercase;letter-spacing:1px;font-family:var(--font-sans)}
-label{font-size:12px;color:var(--sub);display:block;margin-bottom:6px}
+label{font-size:11px;color:var(--sub);display:block;margin-bottom:6px}
 input[type=text]{
-  width:100%;padding:9px 11px;border:1px solid var(--border);border-radius:6px;
-  font-size:12px;background:transparent;color:var(--text);outline:none;font-family:var(--font-mono);
+  width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:6px;
+  font-size:11px;background:transparent;color:var(--text);outline:none;font-family:var(--font-mono);
 }
 input[type=text]:focus{border-color:var(--blue)}
 input[type=text]::placeholder{color:var(--sub)}
 .btn{
-  padding:9px 14px;border:none;border-radius:6px;font-size:12.5px;font-weight:500;
+  padding:8px 14px;border:none;border-radius:6px;font-size:11.5px;font-weight:500;
   cursor:pointer;transition:opacity .15s;font-family:var(--font-sans);
 }
 .btn:active{opacity:.7}
@@ -46,7 +46,7 @@ input[type=text]::placeholder{color:var(--sub)}
   padding:2px 0 8px;color:var(--blue);font-family:var(--font-mono)}
 #qrbox{display:flex;justify-content:center;padding:6px 0 2px}
 #qrbox img,#qrbox canvas{border-radius:8px;width:110px;height:110px}
-.status{display:flex;align-items:center;gap:7px;font-size:12px;color:var(--sub);font-family:var(--font-mono)}
+.status{display:flex;align-items:center;gap:7px;font-size:11px;color:var(--sub);font-family:var(--font-mono)}
 .dot{width:6px;height:6px;border-radius:50%;background:var(--sub);flex:none}
 .dot.live{background:var(--green)}
 .dot.pending{background:var(--orange)}
@@ -130,7 +130,7 @@ body.dragging{outline:3px dashed var(--blue);outline-offset:-3px}
    internally instead of pushing everything else off-screen for a huge one. */
 #stagingList{flex:none;max-height:340px;overflow-y:auto;min-height:0}
 .workspace-actions{display:flex;gap:10px;align-items:center;flex-wrap:wrap;flex:none}
-.workspace-actions #sendBtn{flex:1}
+.workspace-actions #sendBtn{flex:none;width:auto}
 
 .tabs{display:flex;gap:4px;background:transparent;border-bottom:1px solid var(--border);padding:0}
 .tab{flex:1;border:none;background:none;padding:10px 0;border-radius:0;font-size:11px;
@@ -278,7 +278,7 @@ body.dragging{outline:3px dashed var(--blue);outline-offset:-3px}
 </div>
 
 <script>
-const VERSION = 'v30';
+const VERSION = 'v31';
 document.getElementById('versionTag').textContent = '· ' + VERSION;
 
 // A stuck old Service Worker from an earlier version of this page could
