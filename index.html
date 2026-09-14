@@ -216,21 +216,30 @@ function addConn(conn) {
     setStatus(conns.size + ' device' + (conns.size > 1 ? 's' : '') + ' connected', 'live');
     renderPeerList();
 
-    dc.onmessage = async (e) => {
-      if (typeof e.data === 'string') {
-        const msg = JSON.parse(e.data);
-        if (msg.type === 'hello') {
-          entry.name = msg.name;
-          renderPeerList();
-        } else if (msg.type === 'file-start') {
-          conn._incoming = await startIncoming(msg.name, msg.size, entry.name);
-        } else if (msg.type === 'file-end' && conn._incoming) {
-          await conn._incoming.finish();
-          conn._incoming = null;
+    // The browser fires 'message' events as packets arrive, without waiting
+    // for a previous async handler call to finish - if handling one message
+    // awaits something (the SW handshake below), later messages for the same
+    // file can be dispatched and evaluated before conn._incoming is even set,
+    // and get silently dropped. Chain them through one queue per connection
+    // so message N+1 never starts until message N is fully processed.
+    let queue = Promise.resolve();
+    dc.onmessage = (e) => {
+      queue = queue.then(async () => {
+        if (typeof e.data === 'string') {
+          const msg = JSON.parse(e.data);
+          if (msg.type === 'hello') {
+            entry.name = msg.name;
+            renderPeerList();
+          } else if (msg.type === 'file-start') {
+            conn._incoming = await startIncoming(msg.name, msg.size, entry.name);
+          } else if (msg.type === 'file-end' && conn._incoming) {
+            await conn._incoming.finish();
+            conn._incoming = null;
+          }
+        } else if (conn._incoming) {
+          await conn._incoming.write(e.data);
         }
-      } else if (conn._incoming) {
-        await conn._incoming.write(e.data);
-      }
+      });
     };
   });
   conn.on('close', () => {
