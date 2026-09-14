@@ -79,19 +79,21 @@ input[type=text]:focus{border-color:var(--blue)}
 .badge.in{background:var(--green)}
 .badge.out{background:var(--blue)}
 
-/* Desktop/laptop: same single centered column as mobile (a two-column
-   split left an empty void on the right before connecting), just capped
-   to the viewport height so the page itself never scrolls - only the
-   Activity feed scrolls within its own card as it fills up. */
+/* Desktop/laptop: same single centered column as mobile, sized compactly
+   enough to fit typical laptop viewports without scrolling - but overflow
+   is never hidden. A previous version used overflow:hidden here and it
+   clipped the QR code off-screen with no way to reach it on a 13" laptop,
+   which is strictly worse than scrolling. Scroll stays available as a
+   fallback; the point of this block is to make it rarely needed. */
 @media (min-width:900px){
-  body{height:100vh;overflow:hidden;padding:28px 16px;display:flex;flex-direction:column}
-  .wrap{max-width:480px;width:100%;margin:0 auto;flex:1;min-height:0;
-    display:flex;flex-direction:column}
-  h1{font-size:26px}
-  .col-left{flex:none}
-  #transfer.col-right{display:flex;flex-direction:column;flex:1;min-height:0}
-  .activity-card{flex:1;display:flex;flex-direction:column;min-height:0}
-  .activity-card #list{overflow-y:auto;flex:1}
+  body{min-height:100vh;padding:20px 16px}
+  .wrap{max-width:440px;width:100%;margin:0 auto;display:flex;flex-direction:column}
+  h1{font-size:22px;margin:0 0 2px}
+  .tagline{margin-bottom:4px}
+  .card{padding:14px;margin-bottom:10px}
+  .code{font-size:28px;padding:2px 0 8px}
+  #qrbox img,#qrbox canvas{width:120px;height:120px}
+  .activity-card #list{max-height:38vh;overflow-y:auto}
 }
 </style></head>
 <body>
@@ -146,7 +148,7 @@ input[type=text]:focus{border-color:var(--blue)}
 </div>
 
 <script>
-const VERSION = 'v17';
+const VERSION = 'v18';
 document.getElementById('versionTag').textContent = VERSION;
 
 // A stuck old Service Worker from an earlier version of this page could
