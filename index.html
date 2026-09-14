@@ -111,14 +111,18 @@ input[type=text]::placeholder{color:var(--sub)}
 .file-icon{width:20px;height:20px;flex:none;color:var(--sub);display:flex;align-items:center;justify-content:center}
 .send-total{font-size:11px;color:var(--sub);font-family:var(--font-mono);white-space:nowrap}
 
+/* Fixed, compact box - never balloons to fill the page even when nothing
+   is queued. The staged-files list below it (not this box) is what grows
+   to fill the remaining space, matching the reference design. */
 #drop{
   border:2px dashed var(--border);border-radius:8px;padding:14px 16px;text-align:center;
-  color:var(--sub);font-size:13px;transition:.15s;flex:1;display:flex;
-  align-items:center;justify-content:center;min-height:120px;font-family:var(--font-sans)
+  color:var(--sub);font-size:13px;transition:.15s;flex:none;height:130px;display:flex;
+  align-items:center;justify-content:center;font-family:var(--font-sans)
 }
 #drop.over{border-color:var(--blue);background:rgba(31,111,235,.06)}
 body.dragging{outline:3px dashed var(--blue);outline-offset:-3px}
-.workspace-actions{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+#stagingList{flex:1;overflow-y:auto;min-height:0}
+.workspace-actions{display:flex;gap:10px;align-items:center;flex-wrap:wrap;flex:none}
 .workspace-actions .btn{flex:1}
 .workspace-actions #sendBtn{flex:none}
 
@@ -240,6 +244,7 @@ body.dragging{outline:3px dashed var(--blue);outline-offset:-3px}
     </div>
     <div id="drop">Drag files or folders anywhere on this page, or use + Add file/folder below</div>
     <input type="file" id="fileInput" multiple class="hidden">
+    <div id="stagingList" class="tabpanel"></div>
     <div class="workspace-actions">
       <button class="btn btn-secondary" onclick="document.getElementById('fileInput').click()">+ Add file/folder</button>
       <button class="btn btn-primary" id="sendBtn" disabled>Send files</button>
@@ -252,15 +257,15 @@ body.dragging{outline:3px dashed var(--blue);outline-offset:-3px}
       <button class="tab active" id="queueTab" onclick="switchTab('queue')">Queue <span class="tab-badge hidden" id="queueBadge"></span></button>
       <button class="tab" id="historyTab" onclick="switchTab('history')">History <span class="tab-badge hidden" id="historyBadge"></span></button>
     </div>
-    <div id="queueList" class="tabpanel"><div class="empty">No files queued. Add files and hit Send.</div></div>
-    <div id="historyList" class="tabpanel hidden"><div class="empty">nothing yet</div></div>
+    <div id="activeList" class="tabpanel"><div class="empty">No active transfers. Select files and hit Send.</div></div>
+    <div id="historyList" class="tabpanel hidden"><div class="empty">No completed transfers yet.</div></div>
   </aside>
 
   </div>
 </div>
 
 <script>
-const VERSION = 'v26';
+const VERSION = 'v27';
 document.getElementById('versionTag').textContent = '· ' + VERSION;
 
 // A stuck old Service Worker from an earlier version of this page could
@@ -511,7 +516,7 @@ function fmtTime() {
 function switchTab(which) {
   document.getElementById('queueTab').classList.toggle('active', which === 'queue');
   document.getElementById('historyTab').classList.toggle('active', which === 'history');
-  document.getElementById('queueList').classList.toggle('hidden', which !== 'queue');
+  document.getElementById('activeList').classList.toggle('hidden', which !== 'queue');
   document.getElementById('historyList').classList.toggle('hidden', which !== 'history');
 }
 
@@ -520,14 +525,14 @@ function switchTab(which) {
 const pendingRows = new Map();
 
 function addPendingRow(name, fromName) {
-  const list = document.getElementById('historyList');
+  const list = document.getElementById('activeList');
   if (list.querySelector('.empty')) list.innerHTML = '';
   const row = document.createElement('div');
   row.className = 'filerow';
-  const meta = document.createElement('div');
-  meta.className = 'meta';
-  meta.innerHTML = `<div class="name">${name}</div><div class="from">receiving from ${fromName}...</div>`;
-  row.appendChild(meta);
+  row.innerHTML =
+    `<span class="file-icon">${ICON.file}</span>` +
+    `<div class="meta"><div class="name">${name}</div><div class="from">receiving from ${fromName}...</div></div>` +
+    `<span class="status-icon spin">${ICON.spinner}</span>`;
   list.prepend(row);
   pendingRows.set(fromName + '|' + name, row);
   updateTabBadges();
@@ -539,7 +544,8 @@ function addReceivedRow(name, size, fromName, blobUrl) {
   const pendingKey = fromName + '|' + name;
   const existing = pendingRows.get(pendingKey);
   pendingRows.delete(pendingKey);
-  const row = existing || document.createElement('div');
+  if (existing) existing.remove(); // was in the active-transfers list, not this one
+  const row = document.createElement('div');
   row.className = 'filerow';
   row.innerHTML = '';
   const badge = document.createElement('span');
@@ -573,13 +579,17 @@ function addReceivedRow(name, size, fromName, blobUrl) {
   discard.textContent = 'Discard';
   discard.onclick = () => { if (blobUrl) URL.revokeObjectURL(blobUrl); row.remove(); showHistoryEmptyIfNeeded(); updateTabBadges(); };
   row.appendChild(discard);
-  if (!existing) list.prepend(row);
+  list.prepend(row);
   updateTabBadges();
 }
 
 function showHistoryEmptyIfNeeded() {
   const list = document.getElementById('historyList');
-  if (!list.children.length) list.innerHTML = '<div class="empty">nothing yet</div>';
+  if (!list.children.length) list.innerHTML = '<div class="empty">No completed transfers yet.</div>';
+}
+function showActiveEmptyIfNeeded() {
+  const list = document.getElementById('activeList');
+  if (!list.children.length) list.innerHTML = '<div class="empty">No active transfers. Select files and hit Send.</div>';
 }
 
 const sentRows = new Map(); // peerId|name -> { row, statusEl, iconEl, barEl, toName }
@@ -589,7 +599,7 @@ const sentRows = new Map(); // peerId|name -> { row, statusEl, iconEl, barEl, to
 // reference design, where every queued item is visible immediately instead
 // of appearing one at a time.
 function addSentRow(peerId, name, size, toName) {
-  const list = document.getElementById('historyList');
+  const list = document.getElementById('activeList');
   if (list.querySelector('.empty')) list.innerHTML = '';
   const row = document.createElement('div');
   row.className = 'filerow';
@@ -633,29 +643,43 @@ function markSent(peerId, name) {
   entry.statusEl.textContent = 'sent to ' + entry.toName + ', waiting for confirmation...';
 }
 
+// Once a transfer reaches a terminal state, its row moves out of the
+// active-transfers list and into History - it doesn't just change icon in
+// place, matching how the reference design separates the two tabs.
+function moveToHistory(entry) {
+  entry.row.querySelector('.progress')?.remove();
+  entry.row.remove();
+  const list = document.getElementById('historyList');
+  if (list.querySelector('.empty')) list.innerHTML = '';
+  list.prepend(entry.row);
+  showActiveEmptyIfNeeded();
+  updateTabBadges();
+}
+
 function markDelivered(peerId, name) {
   const entry = sentRows.get(peerId + '|' + name);
   if (!entry) return;
-  entry.row.querySelector('.progress').remove();
   entry.iconEl.className = 'status-icon ok';
   entry.iconEl.innerHTML = ICON.check;
   entry.statusEl.textContent = 'delivered to ' + entry.toName;
+  moveToHistory(entry);
 }
 
 function markFailed(peerId, name, reason) {
   const entry = sentRows.get(peerId + '|' + name);
   if (!entry) return;
-  entry.row.querySelector('.progress').remove();
   entry.iconEl.className = 'status-icon fail';
   entry.iconEl.innerHTML = ICON.fail;
   entry.statusEl.textContent = 'failed to send to ' + entry.toName + (reason ? ': ' + reason : '');
+  moveToHistory(entry);
 }
 
 function updateTabBadges() {
   const queueBadge = document.getElementById('queueBadge');
   const historyBadge = document.getElementById('historyBadge');
-  queueBadge.textContent = queue.length;
-  queueBadge.classList.toggle('hidden', !queue.length);
+  const activeCount = document.getElementById('activeList').querySelectorAll('.filerow').length;
+  queueBadge.textContent = activeCount;
+  queueBadge.classList.toggle('hidden', !activeCount);
   const historyCount = document.getElementById('historyList').querySelectorAll('.filerow').length;
   historyBadge.textContent = historyCount;
   historyBadge.classList.toggle('hidden', !historyCount);
@@ -666,8 +690,8 @@ function updateTabBadges() {
 let queue = []; // array of File (folders already zipped into one File each)
 
 function renderQueue() {
-  const list = document.getElementById('queueList');
-  if (!queue.length) { list.innerHTML = '<div class="empty">No files queued. Add files and hit Send.</div>'; updateSendButton(); updateTabBadges(); return; }
+  const list = document.getElementById('stagingList');
+  if (!queue.length) { list.innerHTML = ''; updateSendButton(); updateTabBadges(); return; }
   list.innerHTML = '';
   const head = document.createElement('div');
   head.className = 'queue-head';
@@ -751,7 +775,6 @@ async function addToQueue(fileList) {
   const prepared = await prepareFiles(fileList);
   queue.push(...prepared);
   renderQueue();
-  switchTab('queue');
 }
 
 // ---- sending ----
@@ -793,7 +816,7 @@ document.getElementById('sendBtn').addEventListener('click', async () => {
   const toSend = queue;
   queue = [];
   renderQueue();
-  switchTab('history');
+  switchTab('queue');
   // Every queued file gets a row immediately (clock icon, matching the
   // reference design) instead of appearing one at a time as its turn comes.
   for (const file of toSend) addSentRow(target.conn.peer, file.webkitRelativePath || file.name, file.size, target.name);
