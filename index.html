@@ -1,0 +1,190 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>P2P File Share</title>
+<style>
+body{font-family:sans-serif;max-width:680px;margin:30px auto;padding:0 16px;line-height:1.4}
+h2{margin-bottom:4px}
+.step{border:1px solid #ddd;border-radius:10px;padding:16px;margin:14px 0}
+.step h3{margin:0 0 8px}
+textarea{width:100%;box-sizing:border-box;height:70px;font-family:monospace;font-size:12px}
+button{padding:8px 14px;margin-top:6px;cursor:pointer}
+#drop{border:3px dashed #888;border-radius:12px;padding:50px 20px;text-align:center;color:#555;margin:14px 0}
+#drop.over{border-color:#08c;background:#eef8ff}
+#status{font-weight:bold}
+li{margin:4px 0}
+.hidden{display:none}
+small{color:#666}
+</style></head>
+<body>
+<h2>P2P File Share</h2>
+<small>Direct browser-to-browser transfer. No server ever sees your files.</small>
+
+<div class="step">
+  <h3>Status</h3>
+  <div id="status">not connected</div>
+</div>
+
+<div class="step" id="createStep">
+  <h3>Option A: Start a connection</h3>
+  <button onclick="createOffer()">Generate connect code</button>
+  <div id="offerBox" class="hidden">
+    <p>Send this code to the other device (chat, email, whatever):</p>
+    <textarea id="offerOut" readonly onclick="this.select()"></textarea>
+    <p>Then paste their reply code here and click Finish:</p>
+    <textarea id="answerIn" placeholder="paste their answer code here"></textarea>
+    <button onclick="finishConnect()">Finish connecting</button>
+  </div>
+</div>
+
+<div class="step" id="joinStep">
+  <h3>Option B: Join with a code someone sent you</h3>
+  <textarea id="offerIn" placeholder="paste their connect code here"></textarea>
+  <button onclick="joinOffer()">Generate reply code</button>
+  <div id="answerBox" class="hidden">
+    <p>Send this reply code back to them:</p>
+    <textarea id="answerOut" readonly onclick="this.select()"></textarea>
+  </div>
+</div>
+
+<div id="transfer" class="step hidden">
+  <h3>Send a file</h3>
+  <div id="drop">Drag a file here to send it</div>
+  <h3>Received files</h3>
+  <ul id="list"><li>(none yet)</li></ul>
+</div>
+
+<script>
+const CHUNK = 16 * 1024;
+let pc, dc;
+const statusEl = document.getElementById('status');
+
+function setStatus(s) { statusEl.textContent = s; }
+
+function newPeerConnection() {
+  pc = new RTCPeerConnection({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] });
+  pc.onconnectionstatechange = () => setStatus(pc.connectionState);
+  return pc;
+}
+
+function waitForIceComplete(pc) {
+  if (pc.iceGatheringState === 'complete') return Promise.resolve();
+  return new Promise(resolve => {
+    pc.onicegatheringstatechange = () => {
+      if (pc.iceGatheringState === 'complete') resolve();
+    };
+  });
+}
+
+function encode(desc) { return btoa(JSON.stringify(desc)); }
+function decode(str) { return JSON.parse(atob(str.trim())); }
+
+async function createOffer() {
+  newPeerConnection();
+  dc = pc.createDataChannel('files');
+  setupChannel();
+  const offer = await pc.createOffer();
+  await pc.setLocalDescription(offer);
+  await waitForIceComplete(pc);
+  document.getElementById('offerOut').value = encode(pc.localDescription);
+  document.getElementById('offerBox').classList.remove('hidden');
+  setStatus('waiting for their reply code...');
+}
+
+async function finishConnect() {
+  const answer = decode(document.getElementById('answerIn').value);
+  await pc.setRemoteDescription(answer);
+  setStatus('connecting...');
+}
+
+async function joinOffer() {
+  newPeerConnection();
+  pc.ondatachannel = e => { dc = e.channel; setupChannel(); };
+  const offer = decode(document.getElementById('offerIn').value);
+  await pc.setRemoteDescription(offer);
+  const answer = await pc.createAnswer();
+  await pc.setLocalDescription(answer);
+  await waitForIceComplete(pc);
+  document.getElementById('answerOut').value = encode(pc.localDescription);
+  document.getElementById('answerBox').classList.remove('hidden');
+  setStatus('connecting...');
+}
+
+function setupChannel() {
+  dc.binaryType = 'arraybuffer';
+  dc.onopen = () => {
+    setStatus('connected');
+    document.getElementById('transfer').classList.remove('hidden');
+  };
+  dc.onclose = () => setStatus('disconnected');
+  let incoming = null;
+  dc.onmessage = async (e) => {
+    if (typeof e.data === 'string') {
+      const msg = JSON.parse(e.data);
+      if (msg.type === 'file-start') {
+        incoming = { name: msg.name, size: msg.size, received: 0, chunks: [], writer: null };
+        if (window.showSaveFilePicker) {
+          try {
+            const handle = await window.showSaveFilePicker({ suggestedName: msg.name });
+            incoming.writer = await handle.createWritable();
+          } catch (err) { incoming.writer = null; }
+        }
+      } else if (msg.type === 'file-end' && incoming) {
+        if (incoming.writer) {
+          await incoming.writer.close();
+        } else {
+          const blob = new Blob(incoming.chunks);
+          const url = URL.createObjectURL(blob);
+          const li = document.createElement('a');
+          li.href = url; li.download = incoming.name; li.textContent = incoming.name;
+          const wrap = document.createElement('li');
+          wrap.appendChild(li);
+          const list = document.getElementById('list');
+          if (list.children[0]?.textContent === '(none yet)') list.innerHTML = '';
+          list.appendChild(wrap);
+        }
+        incoming = null;
+      }
+    } else if (incoming) {
+      incoming.received += e.data.byteLength;
+      if (incoming.writer) {
+        await incoming.writer.write(e.data);
+      } else {
+        incoming.chunks.push(e.data);
+      }
+    }
+  };
+}
+
+async function sendFile(file) {
+  dc.send(JSON.stringify({ type: 'file-start', name: file.name, size: file.size }));
+  const reader = file.stream().getReader();
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    for (let off = 0; off < value.byteLength; off += CHUNK) {
+      const slice = value.slice(off, off + CHUNK);
+      while (dc.bufferedAmount > 8 * 1024 * 1024) {
+        await new Promise(r => setTimeout(r, 20));
+      }
+      dc.send(slice);
+    }
+  }
+  dc.send(JSON.stringify({ type: 'file-end' }));
+}
+
+const drop = document.getElementById('drop');
+['dragenter', 'dragover'].forEach(ev => drop.addEventListener(ev, e => {
+  e.preventDefault(); drop.classList.add('over');
+}));
+['dragleave', 'drop'].forEach(ev => drop.addEventListener(ev, e => {
+  e.preventDefault(); drop.classList.remove('over');
+}));
+drop.addEventListener('drop', async e => {
+  for (const file of e.dataTransfer.files) {
+    drop.textContent = 'sending ' + file.name + '...';
+    await sendFile(file);
+  }
+  drop.textContent = 'Drag a file here to send it';
+});
+</script>
+</body></html>
