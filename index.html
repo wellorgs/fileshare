@@ -78,6 +78,7 @@ input[type=text]:focus{border-color:var(--blue)}
 <div class="wrap">
   <h1>Share</h1>
   <p class="tagline">Direct device-to-device. Nothing touches a server.</p>
+  <p class="tagline" id="versionTag" style="margin-top:-16px"></p>
 
   <div class="card">
     <h3>Your name</h3>
@@ -115,6 +116,10 @@ input[type=text]:focus{border-color:var(--blue)}
       <input type="file" id="fileInput" multiple class="hidden">
     </div>
     <div class="card">
+      <h3>Sent</h3>
+      <div id="sentList"><div class="empty">nothing yet</div></div>
+    </div>
+    <div class="card">
       <h3>Received</h3>
       <div id="list"><div class="empty">nothing yet</div></div>
     </div>
@@ -122,6 +127,16 @@ input[type=text]:focus{border-color:var(--blue)}
 </div>
 
 <script>
+const VERSION = 'v14';
+document.getElementById('versionTag').textContent = VERSION;
+
+// A stuck old Service Worker from an earlier version of this page could
+// still be intercepting requests and breaking things. That whole approach
+// is gone now - proactively clear out any leftover registration.
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.getRegistrations().then(regs => regs.forEach(r => r.unregister()));
+}
+
 let peer;
 const conns = new Map(); // conn.peer -> { conn, name }
 const statusEl = document.getElementById('status');
@@ -232,10 +247,13 @@ function addConn(conn) {
             renderPeerList();
           } else if (msg.type === 'file-start') {
             addPendingRow(msg.name, entry.name);
-            conn._incoming = await startIncoming(msg.name, msg.size, entry.name);
+            conn._incoming = startIncoming(msg.name, msg.size, entry.name);
           } else if (msg.type === 'file-end' && conn._incoming) {
             await conn._incoming.finish();
+            dc.send(JSON.stringify({ type: 'delivered', name: conn._incoming.name }));
             conn._incoming = null;
+          } else if (msg.type === 'delivered') {
+            markDelivered(conn.peer, msg.name);
           }
         } else if (conn._incoming) {
           await conn._incoming.write(e.data);
@@ -251,50 +269,22 @@ function addConn(conn) {
   conn.on('error', err => console.error('connection error', err));
 }
 
-// ---- receiving: streams to disk, never buffers the whole file ----
-
-let swReadyPromise = null;
-if ('serviceWorker' in navigator) {
-  swReadyPromise = navigator.serviceWorker.register('sw.js').then(() => navigator.serviceWorker.ready);
-}
-
-async function startIncoming(name, size, fromName) {
-  // Note: the File System Access API's showSaveFilePicker() requires a live
-  // user gesture, which doesn't exist when a file starts arriving async over
-  // the network - it can't be used here. The Service Worker path below needs
-  // no gesture and still streams straight to disk, so it's the primary tier.
-  if (swReadyPromise) {
-    try {
-      await swReadyPromise;
-      if (navigator.serviceWorker.controller) {
-        const id = Date.now() + '-' + Math.random().toString(36).slice(2);
-        const channel = new MessageChannel();
-        const ready = new Promise(resolve => {
-          navigator.serviceWorker.addEventListener('message', function onMsg(e) {
-            if (e.data && e.data.type === 'stream-ready' && e.data.id === id) {
-              navigator.serviceWorker.removeEventListener('message', onMsg);
-              resolve();
-            }
-          });
-        });
-        navigator.serviceWorker.controller.postMessage(
-          { type: 'stream-start', id, filename: name, size }, [channel.port2]
-        );
-        await ready;
-        const a = document.createElement('a');
-        a.href = location.pathname.replace(/\/[^/]*$/, '/') + '__download__/' + id;
-        a.download = name;
-        document.body.appendChild(a); a.click(); a.remove();
-        return {
-          write: (chunk) => channel.port1.postMessage({ type: 'chunk', buffer: chunk }, [chunk]),
-          finish: async () => { channel.port1.postMessage({ type: 'end' }); addReceivedRow(name, size, fromName, null); }
-        };
-      }
-    } catch (err) { console.error('SW streaming failed, falling back to memory', err); }
-  }
-  // Tier 3: buffer in memory - last resort, only for browsers with neither API.
+// ---- receiving ----
+//
+// Earlier versions tried streaming straight to disk via the File System
+// Access API (needs a live user gesture that never exists here - the file
+// arrives async off the network) and then a Service Worker relay (fragile
+// in practice: old SW versions get stuck controlling the page since
+// browsers don't swap them in immediately, and GitHub Pages caches sw.js
+// itself, both causing real, hard-to-diagnose failures). Buffering in
+// memory has never failed in testing and needs none of that machinery.
+// ponytail: whole file held in memory - fine up to ~1-2GB depending on
+// the device; for reliably handling bigger files, self-host something
+// like polius/FileSync instead.
+function startIncoming(name, size, fromName) {
   const chunks = [];
   return {
+    name,
     write: (chunk) => { chunks.push(chunk); },
     finish: async () => {
       const url = URL.createObjectURL(new Blob(chunks));
@@ -364,11 +354,46 @@ function showEmptyIfNeeded() {
   if (!list.children.length) list.innerHTML = '<div class="empty">nothing yet</div>';
 }
 
+// ---- sent list: shows Sending -> Sent -> Delivered per (peer, file) ----
+
+const sentRows = new Map(); // peerId|name -> { row, statusEl }
+
+function addSentRow(peerId, name, size, toName) {
+  const list = document.getElementById('sentList');
+  if (list.querySelector('.empty')) list.innerHTML = '';
+  const row = document.createElement('div');
+  row.className = 'filerow';
+  const meta = document.createElement('div');
+  meta.className = 'meta';
+  const nameEl = document.createElement('div');
+  nameEl.className = 'name'; nameEl.textContent = name;
+  const statusEl = document.createElement('div');
+  statusEl.className = 'from'; statusEl.textContent = 'sending to ' + toName + '...';
+  meta.appendChild(nameEl); meta.appendChild(statusEl);
+  row.appendChild(meta);
+  const sizeEl = document.createElement('span');
+  sizeEl.className = 'size'; sizeEl.textContent = fmtSize(size);
+  row.appendChild(sizeEl);
+  list.appendChild(row);
+  sentRows.set(peerId + '|' + name, { row, statusEl, toName });
+}
+
+function markSent(peerId, name) {
+  const entry = sentRows.get(peerId + '|' + name);
+  if (entry) entry.statusEl.textContent = 'sent to ' + entry.toName + ', waiting for confirmation...';
+}
+
+function markDelivered(peerId, name) {
+  const entry = sentRows.get(peerId + '|' + name);
+  if (entry) entry.statusEl.innerHTML = '✓ delivered to ' + entry.toName;
+}
+
 // ---- sending ----
 
 const CHUNK = 16 * 1024;
-async function sendFileTo(conn, file) {
+async function sendFileTo(conn, file, toName) {
   const dc = conn.dataChannel;
+  addSentRow(conn.peer, file.name, file.size, toName);
   dc.send(JSON.stringify({ type: 'file-start', name: file.name, size: file.size }));
   const reader = file.stream().getReader();
   while (true) {
@@ -383,6 +408,7 @@ async function sendFileTo(conn, file) {
     }
   }
   dc.send(JSON.stringify({ type: 'file-end' }));
+  markSent(conn.peer, file.name);
 }
 
 async function sendFiles(fileList) {
@@ -392,7 +418,7 @@ async function sendFiles(fileList) {
   for (const file of fileList) {
     drop.textContent = 'sending ' + file.name + '...';
     try {
-      for (const { conn } of targets) await sendFileTo(conn, file);
+      for (const { conn, name } of targets) await sendFileTo(conn, file, name);
     } catch (err) {
       alert('send failed: ' + err.message);
       break;
