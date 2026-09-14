@@ -59,12 +59,32 @@ input[type=text]:focus{border-color:var(--blue)}
 .section{background:var(--card);border-radius:14px;padding:14px}
 .brand{display:flex;align-items:baseline;gap:8px;margin-bottom:2px}
 
-.device-row{display:flex;align-items:center;gap:8px;padding:7px 0;font-size:13px}
+.devices-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+.devices-head h3{margin:0}
+.icon-btn{border:none;background:none;color:var(--sub);cursor:pointer;font-size:14px;
+  padding:2px 4px;line-height:1;border-radius:6px}
+.icon-btn:hover{background:var(--card);color:var(--text)}
+.icon-btn:active{opacity:.6}
+.device-row{display:flex;align-items:center;gap:9px;padding:7px 8px;font-size:13px;
+  border-radius:8px;cursor:pointer}
+.device-row:hover{background:var(--card)}
+.device-row.selected{background:var(--blue);color:#fff}
+.device-row.selected .os-badge{color:#fff;border-color:rgba(255,255,255,.5)}
+.device-row.selected .device-sub{color:rgba(255,255,255,.8)}
+.device-row .dot{flex:none}
+.device-row .device-meta{flex:1;overflow:hidden}
+.device-row .device-name{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.device-row .device-sub{font-size:11px;color:var(--sub);display:flex;align-items:center;gap:5px}
+.device-row .chevron{flex:none;font-size:13px;opacity:.7}
 .avatar{width:24px;height:24px;border-radius:50%;background:var(--blue);color:#fff;
   font-size:11px;font-weight:600;display:flex;align-items:center;justify-content:center;flex:none}
 .os-badge{font-size:9px;font-weight:700;color:var(--sub);border:1px solid var(--border);
   border-radius:4px;padding:1px 4px;flex:none}
-.device-row .dot{background:var(--green);margin-left:auto}
+.devices-count{font-size:11px;color:var(--sub);text-align:center;padding-top:4px}
+.target-header{display:flex;align-items:center;gap:10px}
+.target-header .meta{flex:1;overflow:hidden}
+.target-header .name{font-size:14px;font-weight:600}
+.target-header .sub{font-size:11px;color:var(--sub)}
 
 #drop{
   border:2px dashed var(--border);border-radius:14px;padding:14px 16px;text-align:center;
@@ -143,13 +163,24 @@ body.dragging{outline:3px dashed var(--blue);outline-offset:-3px}
     </div>
 
     <div class="section" id="devicesCard">
-      <h3>Devices</h3>
+      <div class="devices-head">
+        <h3>Devices</h3>
+        <button class="icon-btn" id="refreshDevices" title="Refresh">&#8635;</button>
+      </div>
       <input type="text" id="deviceFilter" placeholder="Filter devices..." style="margin-bottom:8px">
       <div id="peerList"><div class="empty">none connected yet</div></div>
+      <div class="devices-count" id="devicesCount"></div>
     </div>
   </aside>
 
   <main class="workspace">
+    <div id="targetHeader" class="section target-header hidden">
+      <span class="avatar" id="targetAvatar"></span>
+      <div class="meta">
+        <div class="name" id="targetName"></div>
+        <div class="sub" id="targetSub"></div>
+      </div>
+    </div>
     <div id="drop">Drag files or folders anywhere on this page, or use + Add file/folder below</div>
     <input type="file" id="fileInput" multiple class="hidden">
     <div class="workspace-actions">
@@ -170,7 +201,7 @@ body.dragging{outline:3px dashed var(--blue);outline-offset:-3px}
 </div>
 
 <script>
-const VERSION = 'v23';
+const VERSION = 'v24';
 document.getElementById('versionTag').textContent = '· ' + VERSION;
 
 // A stuck old Service Worker from an earlier version of this page could
@@ -193,6 +224,7 @@ const MY_OS = detectOS();
 
 let peer;
 const conns = new Map(); // conn.peer -> { conn, name, os }
+let selectedPeer = null; // peerId of the device files will be sent to
 const statusEl = document.getElementById('status');
 const dotEl = document.getElementById('dot');
 const nameInput = document.getElementById('myName');
@@ -205,23 +237,52 @@ function setStatus(s, dotClass) {
   statusEl.textContent = s;
   dotEl.className = 'dot' + (dotClass ? ' ' + dotClass : '');
 }
+// A device row is click-to-select: exactly one connected device is the
+// active send target at a time (matches the reference design), rather than
+// broadcasting to everyone connected.
 function renderPeerList() {
   const box = document.getElementById('peerList');
-  if (!conns.size) { box.innerHTML = '<div class="empty">none connected yet</div>'; return; }
+  const countEl = document.getElementById('devicesCount');
+  if (selectedPeer && !conns.has(selectedPeer)) selectedPeer = null;
+  if (!selectedPeer && conns.size) selectedPeer = [...conns.keys()][0];
+  countEl.textContent = conns.size ? conns.size + ' connected' : '';
+  if (!conns.size) { box.innerHTML = '<div class="empty">none connected yet</div>'; renderTargetHeader(); return; }
   const filter = document.getElementById('deviceFilter').value.trim().toLowerCase();
-  const matches = [...conns.values()].filter(({ name }) => name.toLowerCase().includes(filter));
-  if (!matches.length) { box.innerHTML = '<div class="empty">no devices match</div>'; updateSendButton(); return; }
+  const matches = [...conns.entries()].filter(([, { name }]) => name.toLowerCase().includes(filter));
+  if (!matches.length) { box.innerHTML = '<div class="empty">no devices match</div>'; renderTargetHeader(); updateSendButton(); return; }
   box.innerHTML = '';
-  for (const { name, os } of matches) {
+  for (const [peerId, { name, os }] of matches) {
+    const selected = peerId === selectedPeer;
     const row = document.createElement('div');
-    row.className = 'device-row';
-    row.innerHTML = `<span class="avatar">${initials(name)}</span><span>${name}</span>` +
-      `<span class="os-badge">${os || '?'}</span><span class="dot"></span>`;
+    row.className = 'device-row' + (selected ? ' selected' : '');
+    row.innerHTML =
+      `<span class="dot live"></span>` +
+      `<div class="device-meta"><div class="device-name">${name}</div>` +
+      `<div class="device-sub"><span class="os-badge">${os || '?'}</span>connected</div></div>` +
+      (selected ? '<span class="chevron">&#8250;</span>' : '');
+    row.onclick = () => { selectedPeer = peerId; renderPeerList(); };
     box.appendChild(row);
   }
+  renderTargetHeader();
   updateSendButton();
 }
 document.getElementById('deviceFilter').addEventListener('input', renderPeerList);
+document.getElementById('refreshDevices').addEventListener('click', () => {
+  for (const { conn, name } of conns.values()) {
+    if (conn.open) conn.dataChannel.send(JSON.stringify({ type: 'hello', name: myName(), os: MY_OS }));
+  }
+  renderPeerList();
+});
+
+function renderTargetHeader() {
+  const header = document.getElementById('targetHeader');
+  const entry = selectedPeer && conns.get(selectedPeer);
+  if (!entry) { header.classList.add('hidden'); return; }
+  header.classList.remove('hidden');
+  document.getElementById('targetAvatar').textContent = initials(entry.name);
+  document.getElementById('targetName').textContent = entry.name;
+  document.getElementById('targetSub').textContent = (entry.os || '?') + ' · connected';
+}
 
 const ICE_CONFIG = {
   iceServers: [
@@ -509,8 +570,8 @@ function renderQueue() {
 }
 
 function updateSendButton() {
-  const targets = [...conns.values()].filter(e => e.conn.open);
-  document.getElementById('sendBtn').disabled = !queue.length || !targets.length;
+  const target = selectedPeer && conns.get(selectedPeer);
+  document.getElementById('sendBtn').disabled = !queue.length || !target || !target.conn.open;
 }
 
 // ---- preparing dropped/picked items: folders get zipped into one file ----
@@ -591,8 +652,8 @@ async function sendFileTo(conn, file, toName) {
 }
 
 document.getElementById('sendBtn').addEventListener('click', async () => {
-  const targets = [...conns.values()].filter(e => e.conn.open);
-  if (!targets.length) { alert('not connected yet'); return; }
+  const target = selectedPeer && conns.get(selectedPeer);
+  if (!target || !target.conn.open) { alert('pick a connected device to send to'); return; }
   if (!queue.length) return;
   const toSend = queue;
   queue = [];
@@ -600,7 +661,7 @@ document.getElementById('sendBtn').addEventListener('click', async () => {
   switchTab('history');
   for (const file of toSend) {
     try {
-      for (const { conn, name } of targets) await sendFileTo(conn, file, name);
+      await sendFileTo(target.conn, file, target.name);
     } catch (err) {
       alert('send failed: ' + err.message);
     }
