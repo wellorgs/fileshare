@@ -238,18 +238,10 @@ if ('serviceWorker' in navigator) {
 }
 
 async function startIncoming(name, size, fromName) {
-  // Tier 1: File System Access API - direct streaming write, best UX.
-  if (window.showSaveFilePicker) {
-    try {
-      const handle = await window.showSaveFilePicker({ suggestedName: name });
-      const writer = await handle.createWritable();
-      return {
-        write: (chunk) => writer.write(chunk),
-        finish: async () => { await writer.close(); addReceivedRow(name, size, fromName, null); }
-      };
-    } catch (err) { /* user cancelled picker or unsupported - fall through */ }
-  }
-  // Tier 2: Service Worker - streams into a normal browser download, no memory buffering.
+  // Note: the File System Access API's showSaveFilePicker() requires a live
+  // user gesture, which doesn't exist when a file starts arriving async over
+  // the network - it can't be used here. The Service Worker path below needs
+  // no gesture and still streams straight to disk, so it's the primary tier.
   if (swReadyPromise) {
     try {
       await swReadyPromise;
