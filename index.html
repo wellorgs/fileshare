@@ -148,7 +148,7 @@ body.dragging{outline:3px dashed var(--blue);outline-offset:-3px}
 </div>
 
 <script>
-const VERSION = 'v20';
+const VERSION = 'v21';
 document.getElementById('versionTag').textContent = '· ' + VERSION;
 
 // A stuck old Service Worker from an earlier version of this page could
@@ -472,8 +472,12 @@ async function sendFiles(fileList) {
 
 // Plain drag-drop only gives top-level dropped items; a dropped folder's
 // contents need walking its DataTransferItem entry tree explicitly.
+// Hidden entries (dotfiles/dotfolders - .git, .DS_Store, node_modules'
+// .cache, etc.) are skipped: dragging a project folder should send the
+// project, not its VCS internals.
 function readEntry(entry, prefix) {
   return new Promise(resolve => {
+    if (entry.name.startsWith('.')) { resolve([]); return; }
     if (entry.isFile) {
       entry.file(file => {
         try {
