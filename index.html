@@ -116,18 +116,21 @@ input[type=text]::placeholder{color:var(--sub)}
    to fill the remaining space, matching the reference design. */
 #drop{
   border:2px dashed var(--border);border-radius:8px;padding:14px 16px;text-align:center;
-  color:var(--sub);font-size:13px;transition:.15s;flex:none;height:130px;display:flex;
-  align-items:center;justify-content:center;font-family:var(--font-sans)
+  color:var(--sub);transition:.15s;flex:none;height:130px;display:flex;cursor:pointer;
+  flex-direction:column;align-items:center;justify-content:center;gap:5px;
+  font-family:var(--font-sans)
 }
+#drop:hover{border-color:var(--sub)}
 #drop.over{border-color:var(--blue);background:rgba(31,111,235,.06)}
+.drop-title{font-size:13px;color:var(--text)}
+.drop-sub{font-size:11px;color:var(--sub)}
 body.dragging{outline:3px dashed var(--blue);outline-offset:-3px}
 /* Natural height, capped - stays compact for a few files (the Send button
    sits right below it, not pinned to the bottom of the page) and scrolls
    internally instead of pushing everything else off-screen for a huge one. */
 #stagingList{flex:none;max-height:340px;overflow-y:auto;min-height:0}
 .workspace-actions{display:flex;gap:10px;align-items:center;flex-wrap:wrap;flex:none}
-.workspace-actions .btn{flex:1}
-.workspace-actions #sendBtn{flex:none}
+.workspace-actions #sendBtn{flex:1}
 
 .tabs{display:flex;gap:4px;background:transparent;border-bottom:1px solid var(--border);padding:0}
 .tab{flex:1;border:none;background:none;padding:10px 0;border-radius:0;font-size:11px;
@@ -249,11 +252,14 @@ body.dragging{outline:3px dashed var(--blue);outline-offset:-3px}
       </div>
       <span class="busy-pill hidden" id="targetBusyPill">busy &mdash; may be slower</span>
     </div>
-    <div id="drop">Drag files or folders anywhere on this page, or use + Add file/folder below</div>
+    <div id="drop" onclick="document.getElementById('fileInput').click()">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      <div class="drop-title">Drop files here or click to browse</div>
+      <div class="drop-sub">Any file type &middot; No size limit</div>
+    </div>
     <input type="file" id="fileInput" multiple class="hidden">
     <div id="stagingList" class="tabpanel"></div>
     <div class="workspace-actions">
-      <button class="btn btn-secondary" onclick="document.getElementById('fileInput').click()">+ Add file/folder</button>
       <button class="btn btn-primary" id="sendBtn" disabled>Send files</button>
       <span class="send-total hidden" id="sendTotal"></span>
     </div>
@@ -272,7 +278,7 @@ body.dragging{outline:3px dashed var(--blue);outline-offset:-3px}
 </div>
 
 <script>
-const VERSION = 'v29';
+const VERSION = 'v30';
 document.getElementById('versionTag').textContent = '· ' + VERSION;
 
 // A stuck old Service Worker from an earlier version of this page could
@@ -933,7 +939,7 @@ document.addEventListener('drop', async e => {
   document.body.classList.remove('dragging');
   try {
     const files = await filesFromDrop(e.dataTransfer);
-    if (!files.length) { alert("Couldn't read anything from that drop - try again, or use + Add file/folder."); return; }
+    if (!files.length) { alert("Couldn't read anything from that drop - try again, or click the drop zone to browse."); return; }
     addToQueue(files);
   } catch (err) {
     alert('Reading the dropped item failed: ' + err.message);
