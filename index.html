@@ -157,8 +157,8 @@ const ICE_CONFIG = {
 
 function randomCode() { return String(Math.floor(100000 + Math.random() * 900000)); }
 
-function showTransfer() {
-  document.getElementById('createStep').classList.add('hidden');
+function showTransfer(keepCode) {
+  if (!keepCode) document.getElementById('createStep').classList.add('hidden');
   document.getElementById('joinStep').classList.add('hidden');
   document.getElementById('transfer').classList.remove('hidden');
 }
@@ -174,7 +174,7 @@ function createRoom() {
     document.getElementById('qrbox').innerHTML = '';
     new QRCode(document.getElementById('qrbox'), { text: url, width: 160, height: 160 });
     setStatus('waiting for devices to join...', 'pending');
-    showTransfer();
+    showTransfer(true); // room code stays visible - more people can still join
   });
   peer.on('connection', c => addConn(c));
   peer.on('error', err => {
