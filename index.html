@@ -6,152 +6,171 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <style>
 :root{
-  --bg:#f2f2f7; --card:#ffffff; --text:#1c1c1e; --sub:#8a8a8e;
+  --bg:#f2f2f7; --panel:#ffffff; --card:#f7f7f9; --text:#1c1c1e; --sub:#8a8a8e;
   --blue:#007aff; --red:#ff3b30; --green:#34c759; --border:#e5e5ea;
 }
 @media (prefers-color-scheme: dark){
-  :root{ --bg:#000000; --card:#1c1c1e; --text:#f2f2f7; --sub:#8a8a8e; --border:#2c2c2e; }
+  :root{ --bg:#000000; --panel:#161618; --card:#1c1c1e; --text:#f2f2f7; --sub:#8a8a8e; --border:#2c2c2e; }
 }
 *{box-sizing:border-box}
 body{
   margin:0; min-height:100vh; background:var(--bg); color:var(--text);
   font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text",system-ui,sans-serif;
-  padding:24px 16px 60px; -webkit-font-smoothing:antialiased;
+  -webkit-font-smoothing:antialiased;
 }
-.wrap{max-width:420px;margin:0 auto}
-h1{font-size:22px;font-weight:700;margin:8px 0 2px;text-align:center}
-.tagline{color:var(--sub);font-size:13px;text-align:center;margin:0 0 24px}
-.card{background:var(--card);border-radius:16px;padding:18px;margin-bottom:14px;
-  box-shadow:0 1px 2px rgba(0,0,0,.04)}
-.card h3{margin:0 0 12px;font-size:13px;font-weight:600;color:var(--sub);
+h1{font-size:19px;font-weight:700;margin:0}
+.tagline{color:var(--sub);font-size:11px;margin:2px 0 0}
+h3{margin:0 0 10px;font-size:12px;font-weight:600;color:var(--sub);
   text-transform:uppercase;letter-spacing:.4px}
 label{font-size:13px;color:var(--sub);display:block;margin-bottom:6px}
 input[type=text]{
-  width:100%;padding:12px 14px;border:1px solid var(--border);border-radius:10px;
-  font-size:16px;background:transparent;color:var(--text);outline:none;
+  width:100%;padding:11px 13px;border:1px solid var(--border);border-radius:10px;
+  font-size:15px;background:transparent;color:var(--text);outline:none;
 }
 input[type=text]:focus{border-color:var(--blue)}
 .btn{
-  width:100%;padding:13px;border:none;border-radius:12px;font-size:16px;font-weight:600;
-  cursor:pointer;margin-top:10px;transition:opacity .15s;
+  padding:12px;border:none;border-radius:10px;font-size:14px;font-weight:600;
+  cursor:pointer;transition:opacity .15s;
 }
 .btn:active{opacity:.7}
-.btn-primary{background:var(--blue);color:#fff}
+.btn:disabled{opacity:.4;cursor:default}
+.btn-primary{background:var(--blue);color:#fff;width:100%}
 .btn-secondary{background:var(--border);color:var(--text)}
-.row{display:flex;gap:10px}
+.row{display:flex;gap:8px}
 .row input{flex:1}
-.row .btn{flex:1;width:auto}
-.code{font-size:34px;font-weight:700;letter-spacing:6px;text-align:center;
-  padding:4px 0 12px;color:var(--blue)}
-#qrbox{display:flex;justify-content:center;padding:8px 0 4px}
-#qrbox img,#qrbox canvas{border-radius:10px}
-.status{display:flex;align-items:center;gap:8px;font-size:14px;color:var(--sub)}
-.dot{width:8px;height:8px;border-radius:50%;background:var(--sub);flex:none}
+.row .btn{flex:none;width:auto}
+.code{font-size:26px;font-weight:700;letter-spacing:4px;text-align:center;
+  padding:2px 0 8px;color:var(--blue)}
+#qrbox{display:flex;justify-content:center;padding:6px 0 2px}
+#qrbox img,#qrbox canvas{border-radius:8px;width:110px;height:110px}
+.status{display:flex;align-items:center;gap:7px;font-size:13px;color:var(--sub)}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--sub);flex:none}
 .dot.live{background:var(--green)}
 .dot.pending{background:#ff9500}
 .dot.err{background:var(--red)}
-.peer{display:flex;align-items:center;gap:8px;padding:6px 0;font-size:14px}
-.peer .dot{background:var(--green)}
-.avatar{width:26px;height:26px;border-radius:50%;background:var(--blue);color:#fff;
-  font-size:12px;font-weight:600;display:flex;align-items:center;justify-content:center;flex:none}
+.hidden{display:none !important}
+
+/* ---- app shell: sidebar / workspace / queue+history ---- */
+.app{display:flex;flex-direction:column;min-height:100vh}
+.sidebar,.rightpanel{padding:16px;display:flex;flex-direction:column;gap:12px}
+.sidebar{background:var(--panel);border-bottom:1px solid var(--border)}
+.rightpanel{background:var(--panel);border-top:1px solid var(--border)}
+.workspace{padding:16px;display:flex;flex-direction:column;gap:12px;flex:1}
+.section{background:var(--card);border-radius:14px;padding:14px}
+.brand{display:flex;align-items:baseline;gap:8px;margin-bottom:2px}
+
+.device-row{display:flex;align-items:center;gap:8px;padding:7px 0;font-size:13px}
+.avatar{width:24px;height:24px;border-radius:50%;background:var(--blue);color:#fff;
+  font-size:11px;font-weight:600;display:flex;align-items:center;justify-content:center;flex:none}
+.os-badge{font-size:9px;font-weight:700;color:var(--sub);border:1px solid var(--border);
+  border-radius:4px;padding:1px 4px;flex:none}
+.device-row .dot{background:var(--green);margin-left:auto}
+
 #drop{
-  border:2px dashed var(--border);border-radius:14px;padding:36px 16px;text-align:center;
-  color:var(--sub);font-size:14px;margin-bottom:10px;transition:.15s;
+  border:2px dashed var(--border);border-radius:14px;padding:14px 16px;text-align:center;
+  color:var(--sub);font-size:14px;transition:.15s;flex:1;display:flex;
+  align-items:center;justify-content:center;min-height:120px;
 }
 #drop.over{border-color:var(--blue);background:rgba(0,122,255,.06)}
 body.dragging{outline:3px dashed var(--blue);outline-offset:-3px}
-.filerow{
-  display:flex;align-items:center;gap:10px;padding:10px 0;
-  border-bottom:1px solid var(--border);
-}
+.workspace-actions{display:flex;gap:10px}
+.workspace-actions .btn{flex:1}
+
+.tabs{display:flex;gap:4px;background:var(--card);border-radius:10px;padding:3px}
+.tab{flex:1;border:none;background:none;padding:8px;border-radius:8px;font-size:13px;
+  font-weight:600;color:var(--sub);cursor:pointer}
+.tab.active{background:var(--panel);color:var(--text);box-shadow:0 1px 2px rgba(0,0,0,.06)}
+.tabpanel{flex:1;overflow-y:auto;min-height:0}
+
+.filerow{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border)}
 .filerow:last-child{border-bottom:none}
 .filerow .meta{flex:1;overflow:hidden}
-.filerow .name{font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.filerow .name{font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .filerow .name a{color:var(--text);text-decoration:none}
 .filerow .from{font-size:11px;color:var(--sub)}
-.filerow .size{font-size:12px;color:var(--sub);flex:none}
+.filerow .size{font-size:11px;color:var(--sub);flex:none}
 .filerow .right{display:flex;flex-direction:column;align-items:flex-end;flex:none;gap:2px}
 .filerow .time{font-size:10px;color:var(--sub)}
-.filerow button{
-  flex:none;border:none;background:none;color:var(--red);font-size:13px;
-  cursor:pointer;padding:4px 6px;
-}
-.empty{color:var(--sub);font-size:13px;text-align:center;padding:8px 0}
-.hidden{display:none !important}
-.badge{width:22px;height:22px;border-radius:50%;flex:none;color:#fff;font-size:12px;
+.filerow button{flex:none;border:none;background:none;color:var(--red);font-size:12px;cursor:pointer;padding:4px 6px}
+.empty{color:var(--sub);font-size:13px;text-align:center;padding:16px 0}
+.badge{width:20px;height:20px;border-radius:50%;flex:none;color:#fff;font-size:11px;
   display:flex;align-items:center;justify-content:center;font-weight:700}
 .badge.in{background:var(--green)}
 .badge.out{background:var(--blue)}
 
-/* Desktop/laptop: same single centered column as mobile, sized compactly
-   enough to fit typical laptop viewports without scrolling - but overflow
-   is never hidden. A previous version used overflow:hidden here and it
-   clipped the QR code off-screen with no way to reach it on a 13" laptop,
-   which is strictly worse than scrolling. Scroll stays available as a
-   fallback; the point of this block is to make it rarely needed. */
+/* Desktop/laptop: three columns filling the viewport, no page-level
+   scroll - each column scrolls internally if its content overflows. */
 @media (min-width:900px){
-  body{min-height:100vh;padding:20px 16px}
-  .wrap{max-width:440px;width:100%;margin:0 auto;display:flex;flex-direction:column}
-  h1{font-size:22px;margin:0 0 2px}
-  .tagline{margin-bottom:4px}
-  .card{padding:14px;margin-bottom:10px}
-  .code{font-size:28px;padding:2px 0 8px}
-  #qrbox img,#qrbox canvas{width:120px;height:120px}
-  .activity-card #list{max-height:38vh;overflow-y:auto}
+  body{height:100vh;overflow:hidden}
+  .app{flex-direction:row;height:100vh}
+  .sidebar{width:280px;flex:none;border-bottom:none;border-right:1px solid var(--border);overflow-y:auto}
+  .workspace{flex:1;min-width:0}
+  .rightpanel{width:300px;flex:none;border-top:none;border-left:1px solid var(--border)}
 }
 </style></head>
 <body>
-<div class="wrap">
-  <div class="col-left">
-  <h1>Share</h1>
-  <p class="tagline">Direct device-to-device. Nothing touches a server. <span id="versionTag"></span></p>
+<div class="app">
 
-  <div class="card">
-    <h3>Your name</h3>
-    <input type="text" id="myName" placeholder="e.g. Akhil's laptop" maxlength="30">
-  </div>
+  <aside class="sidebar">
+    <div class="brand"><h1>Share</h1><span class="tagline" id="versionTag"></span></div>
+    <p class="tagline" style="margin-bottom:4px">Direct device-to-device. Nothing touches a server.</p>
 
-  <div class="card">
-    <div class="status"><span class="dot" id="dot"></span><span id="status">not connected</span></div>
-    <div id="peerList"></div>
-  </div>
-
-  <div class="card" id="createStep">
-    <h3>Start a room</h3>
-    <button class="btn btn-primary" onclick="createRoom()">Create room</button>
-    <div id="codeBox" class="hidden">
-      <div class="code" id="roomCode"></div>
-      <div id="qrbox"></div>
-      <label style="text-align:center">share the code, or scan the QR to join</label>
+    <div class="section">
+      <h3>Your name</h3>
+      <input type="text" id="myName" placeholder="e.g. Akhil's laptop" maxlength="30">
     </div>
-  </div>
 
-  <div class="card" id="joinStep">
-    <h3>Join a room</h3>
-    <div class="row">
-      <input type="text" id="joinCode" placeholder="123456" maxlength="6" inputmode="numeric">
-      <button class="btn btn-primary" style="width:auto;flex:none;padding:13px 20px" onclick="joinRoom()">Connect</button>
+    <div class="section">
+      <div class="status"><span class="dot" id="dot"></span><span id="status">not connected</span></div>
     </div>
-  </div>
 
-  </div>
+    <div class="section" id="createStep">
+      <h3>Start a room</h3>
+      <button class="btn btn-primary" onclick="createRoom()">Create room</button>
+      <div id="codeBox" class="hidden">
+        <div class="code" id="roomCode"></div>
+        <div id="qrbox"></div>
+        <label style="text-align:center">share the code, or scan the QR to join</label>
+      </div>
+    </div>
 
-  <div id="transfer" class="hidden col-right">
-    <div class="card">
-      <h3>Send</h3>
-      <div id="drop">Drag files or folders here, or</div>
+    <div class="section" id="joinStep">
+      <h3>Join a room</h3>
+      <div class="row">
+        <input type="text" id="joinCode" placeholder="123456" maxlength="6" inputmode="numeric">
+        <button class="btn btn-primary" onclick="joinRoom()">Connect</button>
+      </div>
+    </div>
+
+    <div class="section" id="devicesCard">
+      <h3>Devices</h3>
+      <input type="text" id="deviceFilter" placeholder="Filter devices..." style="margin-bottom:8px">
+      <div id="peerList"><div class="empty">none connected yet</div></div>
+    </div>
+  </aside>
+
+  <main class="workspace">
+    <div id="drop">Drag files or folders anywhere on this page, or use + Add file/folder below</div>
+    <input type="file" id="fileInput" multiple class="hidden">
+    <div class="workspace-actions">
       <button class="btn btn-secondary" onclick="document.getElementById('fileInput').click()">+ Add file/folder</button>
-      <input type="file" id="fileInput" multiple class="hidden">
+      <button class="btn btn-primary" id="sendBtn" disabled>Send files</button>
     </div>
-    <div class="card activity-card">
-      <h3>Activity</h3>
-      <div id="list"><div class="empty">nothing yet</div></div>
+  </main>
+
+  <aside class="rightpanel">
+    <div class="tabs">
+      <button class="tab active" id="queueTab" onclick="switchTab('queue')">Queue</button>
+      <button class="tab" id="historyTab" onclick="switchTab('history')">History</button>
     </div>
-  </div>
+    <div id="queueList" class="tabpanel"><div class="empty">No files queued. Add files and hit Send.</div></div>
+    <div id="historyList" class="tabpanel hidden"><div class="empty">nothing yet</div></div>
+  </aside>
+
 </div>
 
 <script>
-const VERSION = 'v22';
+const VERSION = 'v23';
 document.getElementById('versionTag').textContent = '· ' + VERSION;
 
 // A stuck old Service Worker from an earlier version of this page could
@@ -161,8 +180,19 @@ if ('serviceWorker' in navigator) {
   navigator.serviceWorker.getRegistrations().then(regs => regs.forEach(r => r.unregister()));
 }
 
+function detectOS() {
+  const ua = navigator.userAgent;
+  if (/Windows/.test(ua)) return 'WIN';
+  if (/Mac/.test(ua)) return 'MAC';
+  if (/Android/.test(ua)) return 'AND';
+  if (/iPhone|iPad|iPod/.test(ua)) return 'iOS';
+  if (/Linux/.test(ua)) return 'LNX';
+  return '?';
+}
+const MY_OS = detectOS();
+
 let peer;
-const conns = new Map(); // conn.peer -> { conn, name }
+const conns = new Map(); // conn.peer -> { conn, name, os }
 const statusEl = document.getElementById('status');
 const dotEl = document.getElementById('dot');
 const nameInput = document.getElementById('myName');
@@ -177,14 +207,21 @@ function setStatus(s, dotClass) {
 }
 function renderPeerList() {
   const box = document.getElementById('peerList');
+  if (!conns.size) { box.innerHTML = '<div class="empty">none connected yet</div>'; return; }
+  const filter = document.getElementById('deviceFilter').value.trim().toLowerCase();
+  const matches = [...conns.values()].filter(({ name }) => name.toLowerCase().includes(filter));
+  if (!matches.length) { box.innerHTML = '<div class="empty">no devices match</div>'; updateSendButton(); return; }
   box.innerHTML = '';
-  for (const { name } of conns.values()) {
+  for (const { name, os } of matches) {
     const row = document.createElement('div');
-    row.className = 'peer';
-    row.innerHTML = `<span class="avatar">${initials(name)}</span><span>${name}</span><span class="dot"></span>`;
+    row.className = 'device-row';
+    row.innerHTML = `<span class="avatar">${initials(name)}</span><span>${name}</span>` +
+      `<span class="os-badge">${os || '?'}</span><span class="dot"></span>`;
     box.appendChild(row);
   }
+  updateSendButton();
 }
+document.getElementById('deviceFilter').addEventListener('input', renderPeerList);
 
 const ICE_CONFIG = {
   iceServers: [
@@ -196,12 +233,6 @@ const ICE_CONFIG = {
 
 function randomCode() { return String(Math.floor(100000 + Math.random() * 900000)); }
 
-function showTransfer(keepCode) {
-  if (!keepCode) document.getElementById('createStep').classList.add('hidden');
-  document.getElementById('joinStep').classList.add('hidden');
-  document.getElementById('transfer').classList.remove('hidden');
-}
-
 function createRoom() {
   const code = randomCode();
   setStatus('opening room ' + code + '...', 'pending');
@@ -211,9 +242,9 @@ function createRoom() {
     document.getElementById('codeBox').classList.remove('hidden');
     const url = location.origin + location.pathname + '?code=' + code;
     document.getElementById('qrbox').innerHTML = '';
-    new QRCode(document.getElementById('qrbox'), { text: url, width: 160, height: 160 });
+    new QRCode(document.getElementById('qrbox'), { text: url, width: 110, height: 110 });
     setStatus('waiting for devices to join...', 'pending');
-    showTransfer(true); // room code stays visible - more people can still join
+    document.getElementById('joinStep').classList.add('hidden'); // already hosting - code stays visible so more can join
   });
   peer.on('connection', c => addConn(c));
   peer.on('error', err => {
@@ -229,8 +260,9 @@ function joinRoom(codeOverride) {
   setStatus('connecting to room ' + code + '...', 'pending');
   peer = new Peer({ config: ICE_CONFIG });
   peer.on('open', () => {
-    addConn(peer.connect(code, { reliable: true, metadata: { name: myName() } }));
-    showTransfer();
+    addConn(peer.connect(code, { reliable: true, metadata: { name: myName(), os: MY_OS } }));
+    document.getElementById('createStep').classList.add('hidden');
+    document.getElementById('joinStep').classList.add('hidden');
   });
   peer.on('connection', c => addConn(c));
   peer.on('error', err => {
@@ -246,28 +278,29 @@ function joinRoom(codeOverride) {
 // traffic goes straight over the underlying RTCDataChannel, bypassing
 // PeerJS's serializer entirely.
 function addConn(conn) {
-  const entry = { conn, name: (conn.metadata && conn.metadata.name) || 'a device' };
+  const entry = { conn, name: (conn.metadata && conn.metadata.name) || 'a device', os: (conn.metadata && conn.metadata.os) || null };
   conns.set(conn.peer, entry);
   conn.on('open', () => {
     const dc = conn.dataChannel;
     dc.binaryType = 'arraybuffer';
-    dc.send(JSON.stringify({ type: 'hello', name: myName() }));
+    dc.send(JSON.stringify({ type: 'hello', name: myName(), os: MY_OS }));
     setStatus(conns.size + ' device' + (conns.size > 1 ? 's' : '') + ' connected', 'live');
     renderPeerList();
 
     // The browser fires 'message' events as packets arrive, without waiting
     // for a previous async handler call to finish - if handling one message
-    // awaits something (the SW handshake below), later messages for the same
-    // file can be dispatched and evaluated before conn._incoming is even set,
-    // and get silently dropped. Chain them through one queue per connection
-    // so message N+1 never starts until message N is fully processed.
-    let queue = Promise.resolve();
+    // awaits something, later messages for the same file can be dispatched
+    // and evaluated before conn._incoming is even set, and get silently
+    // dropped. Chain them through one queue per connection so message N+1
+    // never starts until message N is fully processed.
+    let msgQueue = Promise.resolve();
     dc.onmessage = (e) => {
-      queue = queue.then(async () => {
+      msgQueue = msgQueue.then(async () => {
         if (typeof e.data === 'string') {
           const msg = JSON.parse(e.data);
           if (msg.type === 'hello') {
             entry.name = msg.name;
+            entry.os = msg.os;
             renderPeerList();
           } else if (msg.type === 'file-start') {
             addPendingRow(msg.name, entry.name);
@@ -312,11 +345,10 @@ function startIncoming(name, size, fromName) {
     write: (chunk) => { chunks.push(chunk); },
     finish: async () => {
       const url = URL.createObjectURL(new Blob(chunks));
-      // The Received row's link only downloads when clicked - if nothing
+      // The History row's link only downloads when clicked - if nothing
       // ever gets clicked, the file exists in the tab but never reaches
-      // disk, which reads as "it says received but I can't find it
-      // anywhere." Trigger the save automatically the moment it's ready;
-      // the row stays as a link too, for re-downloading later.
+      // disk. Trigger the save automatically the moment it's ready; the
+      // row stays as a link too, for re-downloading later.
       const a = document.createElement('a');
       a.href = url; a.download = name;
       document.body.appendChild(a); a.click(); a.remove();
@@ -335,10 +367,21 @@ function fmtTime() {
   return new Date().toLocaleString([], { dateStyle: 'short', timeStyle: 'short' });
 }
 
+// ---- tabs ----
+
+function switchTab(which) {
+  document.getElementById('queueTab').classList.toggle('active', which === 'queue');
+  document.getElementById('historyTab').classList.toggle('active', which === 'history');
+  document.getElementById('queueList').classList.toggle('hidden', which !== 'queue');
+  document.getElementById('historyList').classList.toggle('hidden', which !== 'history');
+}
+
+// ---- history: received + sent activity ----
+
 const pendingRows = new Map();
 
 function addPendingRow(name, fromName) {
-  const list = document.getElementById('list');
+  const list = document.getElementById('historyList');
   if (list.querySelector('.empty')) list.innerHTML = '';
   const row = document.createElement('div');
   row.className = 'filerow';
@@ -346,12 +389,12 @@ function addPendingRow(name, fromName) {
   meta.className = 'meta';
   meta.innerHTML = `<div class="name">${name}</div><div class="from">receiving from ${fromName}...</div>`;
   row.appendChild(meta);
-  list.appendChild(row);
+  list.prepend(row);
   pendingRows.set(fromName + '|' + name, row);
 }
 
 function addReceivedRow(name, size, fromName, blobUrl) {
-  const list = document.getElementById('list');
+  const list = document.getElementById('historyList');
   if (list.querySelector('.empty')) list.innerHTML = '';
   const pendingKey = fromName + '|' + name;
   const existing = pendingRows.get(pendingKey);
@@ -388,23 +431,20 @@ function addReceivedRow(name, size, fromName, blobUrl) {
   row.appendChild(right);
   const discard = document.createElement('button');
   discard.textContent = 'Discard';
-  discard.onclick = () => { if (blobUrl) URL.revokeObjectURL(blobUrl); row.remove(); showEmptyIfNeeded(); };
+  discard.onclick = () => { if (blobUrl) URL.revokeObjectURL(blobUrl); row.remove(); showHistoryEmptyIfNeeded(); };
   row.appendChild(discard);
   if (!existing) list.prepend(row);
 }
 
-function showEmptyIfNeeded() {
-  const list = document.getElementById('list');
+function showHistoryEmptyIfNeeded() {
+  const list = document.getElementById('historyList');
   if (!list.children.length) list.innerHTML = '<div class="empty">nothing yet</div>';
 }
-
-// ---- sent tracking: shows sending -> sent -> delivered per (peer, file),
-// in the same single activity list as received files ----
 
 const sentRows = new Map(); // peerId|name -> { row, statusEl }
 
 function addSentRow(peerId, name, size, toName) {
-  const list = document.getElementById('list');
+  const list = document.getElementById('historyList');
   if (list.querySelector('.empty')) list.innerHTML = '';
   const row = document.createElement('div');
   row.className = 'filerow';
@@ -441,12 +481,91 @@ function markDelivered(peerId, name) {
   if (entry) entry.statusEl.innerHTML = '✓ delivered to ' + entry.toName;
 }
 
+// ---- queue: files staged before sending ----
+
+let queue = []; // array of File (folders already zipped into one File each)
+
+function renderQueue() {
+  const list = document.getElementById('queueList');
+  if (!queue.length) { list.innerHTML = '<div class="empty">No files queued. Add files and hit Send.</div>'; updateSendButton(); return; }
+  list.innerHTML = '';
+  queue.forEach((file, i) => {
+    const row = document.createElement('div');
+    row.className = 'filerow';
+    const meta = document.createElement('div');
+    meta.className = 'meta';
+    meta.innerHTML = `<div class="name">${file.name}</div><div class="from">queued</div>`;
+    row.appendChild(meta);
+    const sizeEl = document.createElement('span');
+    sizeEl.className = 'size'; sizeEl.textContent = fmtSize(file.size);
+    row.appendChild(sizeEl);
+    const remove = document.createElement('button');
+    remove.textContent = 'Remove';
+    remove.onclick = () => { queue.splice(i, 1); renderQueue(); };
+    row.appendChild(remove);
+    list.appendChild(row);
+  });
+  updateSendButton();
+}
+
+function updateSendButton() {
+  const targets = [...conns.values()].filter(e => e.conn.open);
+  document.getElementById('sendBtn').disabled = !queue.length || !targets.length;
+}
+
+// ---- preparing dropped/picked items: folders get zipped into one file ----
+//
+// A browser can only ever trigger individual file downloads - there's no
+// way for a webpage to write an actual folder to the receiver's disk in
+// one action. Sending a folder's files individually means the receiver
+// gets N separate downloads instead of "the folder". Zipping the folder
+// into one file before sending is the only way to deliver it as a single
+// download; the receiver extracts it locally to get the folder back.
+async function zipFolder(folderName, files) {
+  const zip = new JSZip();
+  for (const f of files) {
+    zip.file(f.webkitRelativePath.slice(folderName.length + 1), f);
+  }
+  const blob = await zip.generateAsync({ type: 'blob' });
+  return new File([blob], folderName + '.zip');
+}
+
+async function prepareFiles(fileList) {
+  const loose = [];
+  const folders = new Map(); // top-level folder name -> its files
+  for (const f of fileList) {
+    const rel = f.webkitRelativePath;
+    if (rel && rel.includes('/')) {
+      const top = rel.split('/')[0];
+      if (!folders.has(top)) folders.set(top, []);
+      folders.get(top).push(f);
+    } else {
+      loose.push(f);
+    }
+  }
+  const prepared = [...loose];
+  for (const [folderName, files] of folders) {
+    try {
+      prepared.push(await zipFolder(folderName, files));
+    } catch (err) {
+      alert("Couldn't zip " + folderName + ': ' + err.message);
+    }
+  }
+  return prepared;
+}
+
+async function addToQueue(fileList) {
+  const prepared = await prepareFiles(fileList);
+  queue.push(...prepared);
+  renderQueue();
+  switchTab('queue');
+}
+
 // ---- sending ----
 
 const CHUNK = 16 * 1024;
-// A folder's files carry their relative path (from webkitdirectory input,
-// or from the drag-drop directory walk below) in .webkitRelativePath -
-// that path is used as the transferred "name" throughout, so the receiver
+// A folder's files carry their relative path in .webkitRelativePath - that
+// path is used as the transferred "name" throughout, so the receiver
 // naturally shows "MyFolder/photo.jpg" and Chrome recreates the subfolder
 // under Downloads on save (a "/" in a download's suggested filename does
 // that automatically - no directory-picker or extra protocol needed).
@@ -471,66 +590,28 @@ async function sendFileTo(conn, file, toName) {
   markSent(conn.peer, path);
 }
 
-// A browser can only ever trigger individual file downloads - there's no
-// way for a webpage to write an actual folder to the receiver's disk in
-// one action. Sending a folder's files individually means the receiver
-// gets N separate downloads instead of "the folder". Zipping the folder
-// into one file before sending is the only way to deliver it as a single
-// download; the receiver extracts it locally to get the folder back.
-async function zipFolder(folderName, files) {
-  const zip = new JSZip();
-  for (const f of files) {
-    zip.file(f.webkitRelativePath.slice(folderName.length + 1), f);
-  }
-  const blob = await zip.generateAsync({ type: 'blob' });
-  return new File([blob], folderName + '.zip');
-}
-
-async function sendFiles(fileList) {
+document.getElementById('sendBtn').addEventListener('click', async () => {
   const targets = [...conns.values()].filter(e => e.conn.open);
   if (!targets.length) { alert('not connected yet'); return; }
-  const drop = document.getElementById('drop');
-
-  const loose = [];
-  const folders = new Map(); // top-level folder name -> its files
-  for (const f of fileList) {
-    const rel = f.webkitRelativePath;
-    if (rel && rel.includes('/')) {
-      const top = rel.split('/')[0];
-      if (!folders.has(top)) folders.set(top, []);
-      folders.get(top).push(f);
-    } else {
-      loose.push(f);
-    }
-  }
-
-  const toSend = [...loose];
-  for (const [folderName, files] of folders) {
-    drop.textContent = 'zipping ' + folderName + '...';
-    try {
-      toSend.push(await zipFolder(folderName, files));
-    } catch (err) {
-      alert("Couldn't zip " + folderName + ': ' + err.message);
-    }
-  }
-
+  if (!queue.length) return;
+  const toSend = queue;
+  queue = [];
+  renderQueue();
+  switchTab('history');
   for (const file of toSend) {
-    drop.textContent = 'sending ' + (file.webkitRelativePath || file.name) + '...';
     try {
       for (const { conn, name } of targets) await sendFileTo(conn, file, name);
     } catch (err) {
       alert('send failed: ' + err.message);
-      break;
     }
   }
-  drop.textContent = 'Drag files or folders here, or';
-}
+});
 
 // Plain drag-drop only gives top-level dropped items; a dropped folder's
 // contents need walking its DataTransferItem entry tree explicitly.
-// Hidden entries (dotfiles/dotfolders - .git, .DS_Store, node_modules'
-// .cache, etc.) are skipped: dragging a project folder should send the
-// project, not its VCS internals.
+// Hidden entries (dotfiles/dotfolders - .git, .DS_Store, etc.) are
+// skipped: dragging a project folder should send the project, not its
+// VCS internals.
 function readEntry(entry, prefix) {
   return new Promise(resolve => {
     if (entry.name.startsWith('.')) { resolve([]); return; }
@@ -568,12 +649,10 @@ async function filesFromDrop(dataTransfer) {
   return nested.flat();
 }
 
-// The drop target is the whole page, not just the small box - without a
-// document-level preventDefault, dropping anywhere outside that box (very
-// easy to do, especially with a folder) falls through to the browser's own
-// default action, which navigates the tab to show the raw file/folder
-// instead of any of our JS ever running. That silent hijack is almost
-// certainly why folder drops looked like they did nothing.
+// The drop target is the whole page, not just the box - without a
+// document-level preventDefault, dropping anywhere outside that box falls
+// through to the browser's own default action, which navigates the tab
+// to show the raw file/folder instead of any of our JS ever running.
 const drop = document.getElementById('drop');
 let dragDepth = 0;
 document.addEventListener('dragenter', e => {
@@ -596,14 +675,14 @@ document.addEventListener('drop', async e => {
   try {
     const files = await filesFromDrop(e.dataTransfer);
     if (!files.length) { alert("Couldn't read anything from that drop - try again, or use + Add file/folder."); return; }
-    sendFiles(files);
+    addToQueue(files);
   } catch (err) {
     alert('Reading the dropped item failed: ' + err.message);
   }
 });
 
 document.getElementById('fileInput').addEventListener('change', e => {
-  sendFiles(e.target.files);
+  addToQueue([...e.target.files]);
   e.target.value = '';
 });
 
