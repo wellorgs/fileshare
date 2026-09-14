@@ -2,10 +2,11 @@
 <html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Share</title>
 <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <style>
 :root{
   --bg:#f2f2f7; --card:#ffffff; --text:#1c1c1e; --sub:#8a8a8e;
-  --blue:#007aff; --red:#ff3b30; --border:#e5e5ea;
+  --blue:#007aff; --red:#ff3b30; --green:#34c759; --border:#e5e5ea;
 }
 @media (prefers-color-scheme: dark){
   :root{ --bg:#000000; --card:#1c1c1e; --text:#f2f2f7; --sub:#8a8a8e; --border:#2c2c2e; }
@@ -36,16 +37,21 @@ input[type=text]:focus{border-color:var(--blue)}
 .btn:active{opacity:.7}
 .btn-primary{background:var(--blue);color:#fff}
 .btn-secondary{background:var(--border);color:var(--text)}
-.btn-danger{background:transparent;color:var(--red)}
 .row{display:flex;gap:10px}
 .row input{flex:1}
-.code{font-size:36px;font-weight:700;letter-spacing:6px;text-align:center;
-  padding:16px 0;color:var(--blue)}
+.code{font-size:34px;font-weight:700;letter-spacing:6px;text-align:center;
+  padding:4px 0 12px;color:var(--blue)}
+#qrbox{display:flex;justify-content:center;padding:8px 0 4px}
+#qrbox img,#qrbox canvas{border-radius:10px}
 .status{display:flex;align-items:center;gap:8px;font-size:14px;color:var(--sub)}
 .dot{width:8px;height:8px;border-radius:50%;background:var(--sub);flex:none}
-.dot.live{background:#34c759}
+.dot.live{background:var(--green)}
 .dot.pending{background:#ff9500}
 .dot.err{background:var(--red)}
+.peer{display:flex;align-items:center;gap:8px;padding:6px 0;font-size:14px}
+.peer .dot{background:var(--green)}
+.avatar{width:26px;height:26px;border-radius:50%;background:var(--blue);color:#fff;
+  font-size:12px;font-weight:600;display:flex;align-items:center;justify-content:center;flex:none}
 #drop{
   border:2px dashed var(--border);border-radius:14px;padding:36px 16px;text-align:center;
   color:var(--sub);font-size:14px;margin-bottom:10px;transition:.15s;
@@ -56,8 +62,10 @@ input[type=text]:focus{border-color:var(--blue)}
   border-bottom:1px solid var(--border);
 }
 .filerow:last-child{border-bottom:none}
-.filerow .name{flex:1;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.filerow .meta{flex:1;overflow:hidden}
+.filerow .name{font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .filerow .name a{color:var(--text);text-decoration:none}
+.filerow .from{font-size:11px;color:var(--sub)}
 .filerow .size{font-size:12px;color:var(--sub);flex:none}
 .filerow button{
   flex:none;border:none;background:none;color:var(--red);font-size:13px;
@@ -65,8 +73,6 @@ input[type=text]:focus{border-color:var(--blue)}
 }
 .empty{color:var(--sub);font-size:13px;text-align:center;padding:8px 0}
 .hidden{display:none !important}
-.section-title{font-size:13px;font-weight:600;color:var(--sub);
-  text-transform:uppercase;letter-spacing:.4px;margin:18px 0 8px}
 </style></head>
 <body>
 <div class="wrap">
@@ -78,8 +84,9 @@ input[type=text]:focus{border-color:var(--blue)}
     <input type="text" id="myName" placeholder="e.g. Akhil's laptop" maxlength="30">
   </div>
 
-  <div class="card" id="connectCard">
+  <div class="card">
     <div class="status"><span class="dot" id="dot"></span><span id="status">not connected</span></div>
+    <div id="peerList"></div>
   </div>
 
   <div class="card" id="createStep">
@@ -87,7 +94,8 @@ input[type=text]:focus{border-color:var(--blue)}
     <button class="btn btn-primary" onclick="createRoom()">Create room</button>
     <div id="codeBox" class="hidden">
       <div class="code" id="roomCode"></div>
-      <label style="text-align:center">share this code with the other device</label>
+      <div id="qrbox"></div>
+      <label style="text-align:center">share the code, or scan the QR to join</label>
     </div>
   </div>
 
@@ -114,7 +122,8 @@ input[type=text]:focus{border-color:var(--blue)}
 </div>
 
 <script>
-let peer, conn, peerName = null;
+let peer;
+const conns = new Map(); // conn.peer -> { conn, name }
 const statusEl = document.getElementById('status');
 const dotEl = document.getElementById('dot');
 const nameInput = document.getElementById('myName');
@@ -122,9 +131,20 @@ nameInput.value = localStorage.getItem('shareName') || '';
 nameInput.addEventListener('input', () => localStorage.setItem('shareName', nameInput.value));
 
 function myName() { return nameInput.value.trim() || 'a device'; }
+function initials(n) { return n.trim().split(/\s+/).slice(0, 2).map(w => w[0]).join('').toUpperCase() || '?'; }
 function setStatus(s, dotClass) {
   statusEl.textContent = s;
   dotEl.className = 'dot' + (dotClass ? ' ' + dotClass : '');
+}
+function renderPeerList() {
+  const box = document.getElementById('peerList');
+  box.innerHTML = '';
+  for (const { name } of conns.values()) {
+    const row = document.createElement('div');
+    row.className = 'peer';
+    row.innerHTML = `<span class="avatar">${initials(name)}</span><span>${name}</span><span class="dot"></span>`;
+    box.appendChild(row);
+  }
 }
 
 const ICE_CONFIG = {
@@ -137,6 +157,12 @@ const ICE_CONFIG = {
 
 function randomCode() { return String(Math.floor(100000 + Math.random() * 900000)); }
 
+function showTransfer() {
+  document.getElementById('createStep').classList.add('hidden');
+  document.getElementById('joinStep').classList.add('hidden');
+  document.getElementById('transfer').classList.remove('hidden');
+}
+
 function createRoom() {
   const code = randomCode();
   setStatus('opening room ' + code + '...', 'pending');
@@ -144,9 +170,13 @@ function createRoom() {
   peer.on('open', () => {
     document.getElementById('roomCode').textContent = code;
     document.getElementById('codeBox').classList.remove('hidden');
-    setStatus('waiting for someone to join...', 'pending');
+    const url = location.origin + location.pathname + '?code=' + code;
+    document.getElementById('qrbox').innerHTML = '';
+    new QRCode(document.getElementById('qrbox'), { text: url, width: 160, height: 160 });
+    setStatus('waiting for devices to join...', 'pending');
+    showTransfer();
   });
-  peer.on('connection', c => { conn = c; setupConnection(); });
+  peer.on('connection', c => addConn(c));
   peer.on('error', err => {
     if (err.type === 'unavailable-id') { createRoom(); return; }
     setStatus('error: ' + err.type, 'err');
@@ -154,55 +184,110 @@ function createRoom() {
   });
 }
 
-function joinRoom() {
-  const code = document.getElementById('joinCode').value.trim();
+function joinRoom(codeOverride) {
+  const code = codeOverride || document.getElementById('joinCode').value.trim();
   if (!/^\d{4,6}$/.test(code)) { alert('enter the 4-6 digit code'); return; }
   setStatus('connecting to room ' + code + '...', 'pending');
   peer = new Peer({ config: ICE_CONFIG });
   peer.on('open', () => {
-    conn = peer.connect(code, { reliable: true, metadata: { name: myName() } });
-    setupConnection();
+    addConn(peer.connect(code, { reliable: true, metadata: { name: myName() } }));
+    showTransfer();
   });
+  peer.on('connection', c => addConn(c));
   peer.on('error', err => {
     setStatus('error: ' + err.type, 'err');
     alert('Could not connect: ' + err.type + (err.type === 'peer-unavailable' ? ' — check the code' : ''));
   });
 }
 
-function setupConnection() {
-  setStatus('negotiating...', 'pending');
+function addConn(conn) {
+  const entry = { conn, name: (conn.metadata && conn.metadata.name) || 'a device' };
+  conns.set(conn.peer, entry);
   conn.on('open', () => {
     conn.send({ type: 'hello', name: myName() });
-    if (conn.metadata && conn.metadata.name) peerName = conn.metadata.name;
-    setStatus('connected' + (peerName ? ' to ' + peerName : ''), 'live');
-    document.getElementById('createStep').classList.add('hidden');
-    document.getElementById('joinStep').classList.add('hidden');
-    document.getElementById('transfer').classList.remove('hidden');
+    setStatus(conns.size + ' device' + (conns.size > 1 ? 's' : '') + ' connected', 'live');
+    renderPeerList();
   });
-  conn.on('close', () => setStatus('disconnected', 'err'));
-  conn.on('error', err => { setStatus('connection error', 'err'); alert('Connection error: ' + err); });
+  conn.on('close', () => {
+    conns.delete(conn.peer);
+    renderPeerList();
+    setStatus(conns.size ? conns.size + ' device' + (conns.size > 1 ? 's' : '') + ' connected' : 'disconnected', conns.size ? 'live' : 'err');
+  });
+  conn.on('error', err => console.error('connection error', err));
 
-  let incoming = null;
   conn.on('data', async (data) => {
     if (data && data.type === 'hello') {
-      peerName = data.name;
-      setStatus('connected to ' + peerName, 'live');
+      entry.name = data.name;
+      renderPeerList();
     } else if (data && data.type === 'file-start') {
-      incoming = { name: data.name, size: data.size, writer: null, chunks: [] };
-      if (window.showSaveFilePicker) {
-        try {
-          const handle = await window.showSaveFilePicker({ suggestedName: data.name });
-          incoming.writer = await handle.createWritable();
-        } catch (err) { incoming.writer = null; }
-      }
-    } else if (data && data.type === 'file-end' && incoming) {
-      addReceivedRow(incoming);
-      incoming = null;
-    } else if (incoming && data instanceof ArrayBuffer) {
-      if (incoming.writer) await incoming.writer.write(data);
-      else incoming.chunks.push(data);
+      conn._incoming = await startIncoming(data.name, data.size, entry.name);
+    } else if (data && data.type === 'file-end' && conn._incoming) {
+      await conn._incoming.finish();
+      conn._incoming = null;
+    } else if (conn._incoming && data instanceof ArrayBuffer) {
+      await conn._incoming.write(data);
     }
   });
+}
+
+// ---- receiving: streams to disk, never buffers the whole file ----
+
+let swReadyPromise = null;
+if ('serviceWorker' in navigator) {
+  swReadyPromise = navigator.serviceWorker.register('sw.js').then(() => navigator.serviceWorker.ready);
+}
+
+async function startIncoming(name, size, fromName) {
+  // Tier 1: File System Access API - direct streaming write, best UX.
+  if (window.showSaveFilePicker) {
+    try {
+      const handle = await window.showSaveFilePicker({ suggestedName: name });
+      const writer = await handle.createWritable();
+      return {
+        write: (chunk) => writer.write(chunk),
+        finish: async () => { await writer.close(); addReceivedRow(name, size, fromName, null); }
+      };
+    } catch (err) { /* user cancelled picker or unsupported - fall through */ }
+  }
+  // Tier 2: Service Worker - streams into a normal browser download, no memory buffering.
+  if (swReadyPromise) {
+    try {
+      await swReadyPromise;
+      if (navigator.serviceWorker.controller) {
+        const id = Date.now() + '-' + Math.random().toString(36).slice(2);
+        const channel = new MessageChannel();
+        const ready = new Promise(resolve => {
+          navigator.serviceWorker.addEventListener('message', function onMsg(e) {
+            if (e.data && e.data.type === 'stream-ready' && e.data.id === id) {
+              navigator.serviceWorker.removeEventListener('message', onMsg);
+              resolve();
+            }
+          });
+        });
+        navigator.serviceWorker.controller.postMessage(
+          { type: 'stream-start', id, filename: name, size }, [channel.port2]
+        );
+        await ready;
+        const a = document.createElement('a');
+        a.href = location.pathname.replace(/\/[^/]*$/, '/') + '__download__/' + id;
+        a.download = name;
+        document.body.appendChild(a); a.click(); a.remove();
+        return {
+          write: (chunk) => channel.port1.postMessage({ type: 'chunk', buffer: chunk }, [chunk]),
+          finish: async () => { channel.port1.postMessage({ type: 'end' }); addReceivedRow(name, size, fromName, null); }
+        };
+      }
+    } catch (err) { console.error('SW streaming failed, falling back to memory', err); }
+  }
+  // Tier 3: buffer in memory - last resort, only for browsers with neither API.
+  const chunks = [];
+  return {
+    write: (chunk) => { chunks.push(chunk); },
+    finish: async () => {
+      const url = URL.createObjectURL(new Blob(chunks));
+      addReceivedRow(name, size, fromName, url);
+    }
+  };
 }
 
 function fmtSize(n) {
@@ -211,31 +296,34 @@ function fmtSize(n) {
   return (n / (1024 * 1024)).toFixed(1) + ' MB';
 }
 
-function addReceivedRow(incoming) {
+function addReceivedRow(name, size, fromName, blobUrl) {
   const list = document.getElementById('list');
   if (list.querySelector('.empty')) list.innerHTML = '';
   const row = document.createElement('div');
   row.className = 'filerow';
-
-  if (incoming.writer) {
-    row.innerHTML = `<span class="name">${incoming.name}</span><span class="size">${fmtSize(incoming.size)}</span>`;
-  } else {
-    const blob = new Blob(incoming.chunks);
-    const url = URL.createObjectURL(blob);
-    const nameSpan = document.createElement('span');
-    nameSpan.className = 'name';
+  const meta = document.createElement('div');
+  meta.className = 'meta';
+  const nameEl = document.createElement('div');
+  nameEl.className = 'name';
+  if (blobUrl) {
     const a = document.createElement('a');
-    a.href = url; a.download = incoming.name; a.textContent = incoming.name;
-    nameSpan.appendChild(a);
-    row.appendChild(nameSpan);
-    const sizeSpan = document.createElement('span');
-    sizeSpan.className = 'size'; sizeSpan.textContent = fmtSize(incoming.size);
-    row.appendChild(sizeSpan);
-    const discard = document.createElement('button');
-    discard.textContent = 'Discard';
-    discard.onclick = () => { URL.revokeObjectURL(url); row.remove(); showEmptyIfNeeded(); };
-    row.appendChild(discard);
+    a.href = blobUrl; a.download = name; a.textContent = name;
+    nameEl.appendChild(a);
+  } else {
+    nameEl.textContent = name;
   }
+  const fromEl = document.createElement('div');
+  fromEl.className = 'from';
+  fromEl.textContent = 'from ' + fromName;
+  meta.appendChild(nameEl); meta.appendChild(fromEl);
+  row.appendChild(meta);
+  const sizeEl = document.createElement('span');
+  sizeEl.className = 'size'; sizeEl.textContent = fmtSize(size);
+  row.appendChild(sizeEl);
+  const discard = document.createElement('button');
+  discard.textContent = 'Discard';
+  discard.onclick = () => { if (blobUrl) URL.revokeObjectURL(blobUrl); row.remove(); showEmptyIfNeeded(); };
+  row.appendChild(discard);
   list.appendChild(row);
 }
 
@@ -244,8 +332,10 @@ function showEmptyIfNeeded() {
   if (!list.children.length) list.innerHTML = '<div class="empty">nothing yet</div>';
 }
 
+// ---- sending ----
+
 const CHUNK = 16 * 1024;
-async function sendFile(file) {
+async function sendFileTo(conn, file) {
   conn.send({ type: 'file-start', name: file.name, size: file.size });
   const reader = file.stream().getReader();
   while (true) {
@@ -263,12 +353,13 @@ async function sendFile(file) {
 }
 
 async function sendFiles(fileList) {
-  if (!conn || !conn.open) { alert('not connected yet'); return; }
+  const targets = [...conns.values()].filter(e => e.conn.open);
+  if (!targets.length) { alert('not connected yet'); return; }
   const drop = document.getElementById('drop');
   for (const file of fileList) {
     drop.textContent = 'sending ' + file.name + '...';
     try {
-      await sendFile(file);
+      for (const { conn } of targets) await sendFileTo(conn, file);
     } catch (err) {
       alert('send failed: ' + err.message);
       break;
@@ -290,5 +381,12 @@ document.getElementById('fileInput').addEventListener('change', e => {
   sendFiles(e.target.files);
   e.target.value = '';
 });
+
+// auto-join if opened from a QR code / shared link
+const urlCode = new URLSearchParams(location.search).get('code');
+if (urlCode) {
+  document.getElementById('joinCode').value = urlCode;
+  joinRoom(urlCode);
+}
 </script>
 </body></html>
