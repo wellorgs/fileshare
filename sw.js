@@ -19,7 +19,8 @@ self.addEventListener('message', (e) => {
   port.onmessage = (ev) => {
     const d = ev.data;
     if (d.type === 'chunk') controllerRef.enqueue(new Uint8Array(d.buffer));
-    else if (d.type === 'end') controllerRef.close();
+    else if (d.type === 'end') { controllerRef.close(); delete streams[msg.id]; }
+    else if (d.type === 'error') { controllerRef.error(new Error(d.message)); delete streams[msg.id]; }
   };
   self.clients.matchAll().then(list => list.forEach(c => c.postMessage({ type: 'stream-ready', id: msg.id })));
 });
@@ -29,12 +30,16 @@ self.addEventListener('fetch', (e) => {
   if (!m) return;
   const entry = streams[m[1]];
   if (!entry) { e.respondWith(new Response('not found', { status: 404 })); return; }
-  delete streams[m[1]];
+  // No Content-Length: we'd be declaring it before any bytes actually
+  // arrive, trusting the sender's reported size matches exactly. Any
+  // mismatch makes Chrome's download manager kill the download outright
+  // ("file wasn't available"). Omitting it lets the browser use chunked
+  // transfer and treat the stream's real close() as the end - no
+  // expected-vs-actual size check to fail.
   e.respondWith(new Response(entry.stream, {
     headers: {
       'Content-Type': 'application/octet-stream',
-      'Content-Disposition': "attachment; filename=\"" + entry.filename.replace(/"/g, '') + "\"",
-      'Content-Length': String(entry.size)
+      'Content-Disposition': "attachment; filename=\"" + entry.filename.replace(/"/g, '') + "\""
     }
   }));
 });

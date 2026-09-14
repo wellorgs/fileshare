@@ -231,6 +231,7 @@ function addConn(conn) {
             entry.name = msg.name;
             renderPeerList();
           } else if (msg.type === 'file-start') {
+            addPendingRow(msg.name, entry.name);
             conn._incoming = await startIncoming(msg.name, msg.size, entry.name);
           } else if (msg.type === 'file-end' && conn._incoming) {
             await conn._incoming.finish();
@@ -308,11 +309,30 @@ function fmtSize(n) {
   return (n / (1024 * 1024)).toFixed(1) + ' MB';
 }
 
-function addReceivedRow(name, size, fromName, blobUrl) {
+const pendingRows = new Map();
+
+function addPendingRow(name, fromName) {
   const list = document.getElementById('list');
   if (list.querySelector('.empty')) list.innerHTML = '';
   const row = document.createElement('div');
   row.className = 'filerow';
+  const meta = document.createElement('div');
+  meta.className = 'meta';
+  meta.innerHTML = `<div class="name">${name}</div><div class="from">receiving from ${fromName}...</div>`;
+  row.appendChild(meta);
+  list.appendChild(row);
+  pendingRows.set(fromName + '|' + name, row);
+}
+
+function addReceivedRow(name, size, fromName, blobUrl) {
+  const list = document.getElementById('list');
+  if (list.querySelector('.empty')) list.innerHTML = '';
+  const pendingKey = fromName + '|' + name;
+  const existing = pendingRows.get(pendingKey);
+  pendingRows.delete(pendingKey);
+  const row = existing || document.createElement('div');
+  row.className = 'filerow';
+  row.innerHTML = '';
   const meta = document.createElement('div');
   meta.className = 'meta';
   const nameEl = document.createElement('div');
@@ -336,7 +356,7 @@ function addReceivedRow(name, size, fromName, blobUrl) {
   discard.textContent = 'Discard';
   discard.onclick = () => { if (blobUrl) URL.revokeObjectURL(blobUrl); row.remove(); showEmptyIfNeeded(); };
   row.appendChild(discard);
-  list.appendChild(row);
+  if (!existing) list.appendChild(row);
 }
 
 function showEmptyIfNeeded() {
