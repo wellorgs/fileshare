@@ -58,6 +58,7 @@ input[type=text]:focus{border-color:var(--blue)}
   color:var(--sub);font-size:14px;margin-bottom:10px;transition:.15s;
 }
 #drop.over{border-color:var(--blue);background:rgba(0,122,255,.06)}
+body.dragging{outline:3px dashed var(--blue);outline-offset:-3px}
 .filerow{
   display:flex;align-items:center;gap:10px;padding:10px 0;
   border-bottom:1px solid var(--border);
@@ -147,7 +148,7 @@ input[type=text]:focus{border-color:var(--blue)}
 </div>
 
 <script>
-const VERSION = 'v19';
+const VERSION = 'v20';
 document.getElementById('versionTag').textContent = '· ' + VERSION;
 
 // A stuck old Service Worker from an earlier version of this page could
@@ -507,14 +508,39 @@ async function filesFromDrop(dataTransfer) {
   return nested.flat();
 }
 
+// The drop target is the whole page, not just the small box - without a
+// document-level preventDefault, dropping anywhere outside that box (very
+// easy to do, especially with a folder) falls through to the browser's own
+// default action, which navigates the tab to show the raw file/folder
+// instead of any of our JS ever running. That silent hijack is almost
+// certainly why folder drops looked like they did nothing.
 const drop = document.getElementById('drop');
-['dragenter', 'dragover'].forEach(ev => drop.addEventListener(ev, e => {
-  e.preventDefault(); drop.classList.add('over');
-}));
-['dragleave', 'drop'].forEach(ev => drop.addEventListener(ev, e => {
-  e.preventDefault(); drop.classList.remove('over');
-}));
-drop.addEventListener('drop', async e => sendFiles(await filesFromDrop(e.dataTransfer)));
+let dragDepth = 0;
+document.addEventListener('dragenter', e => {
+  e.preventDefault();
+  dragDepth++;
+  drop.classList.add('over');
+  document.body.classList.add('dragging');
+});
+document.addEventListener('dragover', e => e.preventDefault());
+document.addEventListener('dragleave', e => {
+  e.preventDefault();
+  dragDepth = Math.max(0, dragDepth - 1);
+  if (dragDepth === 0) { drop.classList.remove('over'); document.body.classList.remove('dragging'); }
+});
+document.addEventListener('drop', async e => {
+  e.preventDefault();
+  dragDepth = 0;
+  drop.classList.remove('over');
+  document.body.classList.remove('dragging');
+  try {
+    const files = await filesFromDrop(e.dataTransfer);
+    if (!files.length) { alert("Couldn't read anything from that drop - try again, or use + Add file/folder."); return; }
+    sendFiles(files);
+  } catch (err) {
+    alert('Reading the dropped item failed: ' + err.message);
+  }
+});
 
 document.getElementById('fileInput').addEventListener('change', e => {
   sendFiles(e.target.files);
