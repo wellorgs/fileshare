@@ -143,8 +143,27 @@ input[type=text]::placeholder{color:var(--sub)}
 .drop-title{font-size:13px;color:var(--text)}
 .drop-sub{font-size:11px;color:var(--sub)}
 .pick-row{display:flex;gap:8px;flex:none}
-.pick-btn{flex:1}
+.pick-btn{flex:1;width:auto}
 .pick-btn svg{flex:none}
+
+.theme-switch-input{width:0;height:0;position:absolute;visibility:hidden}
+.theme-switch{
+  width:40px;height:20px;position:relative;display:block;flex:none;cursor:pointer;
+  background:#ebebeb;border-radius:20px;transition:.3s;
+  box-shadow:inset 0 2px 4px rgba(0,0,0,.25),inset 0 -2px 4px rgba(255,255,255,.4);
+}
+.theme-switch:after{
+  content:"";width:16px;height:16px;position:absolute;top:2px;left:2px;
+  background:linear-gradient(180deg,#ffcc89,#d8860b);border-radius:50%;
+  box-shadow:0 2px 4px rgba(0,0,0,.25);transition:.3s;
+}
+.theme-switch svg{position:absolute;top:5px;width:10px;height:10px;z-index:1;transition:.3s}
+.theme-switch svg.sun{left:4px;fill:#fff}
+.theme-switch svg.moon{left:26px;fill:#7e7e7e}
+.theme-switch-input:checked + .theme-switch{background:#242424}
+.theme-switch-input:checked + .theme-switch:after{left:22px;background:linear-gradient(180deg,#777,#3a3a3a)}
+.theme-switch-input:checked + .theme-switch svg.sun{fill:#7e7e7e}
+.theme-switch-input:checked + .theme-switch svg.moon{fill:#fff}
 body.dragging{outline:3px dashed var(--blue);outline-offset:-3px}
 /* Natural height, capped - stays compact for a few files (the Send button
    sits right below it, not pinned to the bottom of the page) and scrolls
@@ -216,7 +235,31 @@ body.dragging{outline:3px dashed var(--blue);outline-offset:-3px}
       <span class="tagline" id="versionTag"></span>
     </div>
     <div class="topbar-me">
-      <button class="icon-btn" id="themeToggle" title="Toggle light/dark theme">&#9728;</button>
+      <input type="checkbox" id="themeToggle" class="theme-switch-input">
+      <label for="themeToggle" class="theme-switch" title="Toggle light/dark theme">
+        <svg class="sun" viewBox="0 0 496 496" xmlns="http://www.w3.org/2000/svg">
+          <rect x="152.994" y="58.921" transform="matrix(0.3827 0.9239 -0.9239 0.3827 168.6176 -118.5145)" width="40.001" height="16"/>
+          <rect x="46.9" y="164.979" transform="matrix(0.9239 0.3827 -0.3827 0.9239 71.29 -12.4346)" width="40.001" height="16"/>
+          <rect x="46.947" y="315.048" transform="matrix(0.9239 -0.3827 0.3827 0.9239 -118.531 50.2116)" width="40.001" height="16"/>
+          <rect x="164.966" y="409.112" transform="matrix(-0.9238 -0.3828 0.3828 -0.9238 168.4872 891.7491)" width="16" height="39.999"/>
+          <rect x="303.031" y="421.036" transform="matrix(-0.3827 -0.9239 0.9239 -0.3827 50.2758 891.6655)" width="40.001" height="16"/>
+          <rect x="409.088" y="315.018" transform="matrix(-0.9239 -0.3827 0.3827 -0.9239 701.898 785.6559)" width="40.001" height="16"/>
+          <rect x="409.054" y="165.011" transform="matrix(-0.9239 0.3827 -0.3827 -0.9239 891.6585 168.6574)" width="40.001" height="16"/>
+          <rect x="315.001" y="46.895" transform="matrix(0.9238 0.3828 -0.3828 0.9238 50.212 -118.5529)" width="16" height="39.999"/>
+          <path d="M248,88c-88.224,0-160,71.776-160,160s71.776,160,160,160s160-71.776,160-160S336.224,88,248,88z M248,392c-79.4,0-144-64.6-144-144s64.6-144,144-144s144,64.6,144,144S327.4,392,248,392z"/>
+          <rect x="240" width="16" height="72"/>
+          <rect x="62.097" y="90.096" transform="matrix(0.7071 0.7071 -0.7071 0.7071 98.0963 -40.6334)" width="71.999" height="16"/>
+          <rect y="240" width="72" height="16"/>
+          <rect x="90.091" y="361.915" transform="matrix(-0.7071 -0.7071 0.7071 -0.7071 -113.9157 748.643)" width="16" height="71.999"/>
+          <rect x="240" y="424" width="16" height="72"/>
+          <rect x="361.881" y="389.915" transform="matrix(-0.7071 -0.7071 0.7071 -0.7071 397.8562 960.6281)" width="71.999" height="16"/>
+          <rect x="424" y="240" width="72" height="16"/>
+          <rect x="389.911" y="62.091" transform="matrix(0.7071 0.7071 -0.7071 0.7071 185.9067 -252.6357)" width="16" height="71.999"/>
+        </svg>
+        <svg class="moon" viewBox="0 0 49.739 49.739" xmlns="http://www.w3.org/2000/svg">
+          <path d="M25.068,48.889c-9.173,0-18.017-5.06-22.396-13.804C-3.373,23.008,1.164,8.467,13.003,1.979l2.061-1.129l-0.615,2.268c-1.479,5.459-0.899,11.25,1.633,16.306c2.75,5.493,7.476,9.587,13.305,11.526c5.831,1.939,12.065,1.492,17.559-1.258v0c0.25-0.125,0.492-0.258,0.734-0.391l2.061-1.13l-0.585,2.252c-1.863,6.873-6.577,12.639-12.933,15.822C32.639,48.039,28.825,48.888,25.068,48.889z M12.002,4.936c-9.413,6.428-12.756,18.837-7.54,29.253c5.678,11.34,19.522,15.945,30.864,10.268c5.154-2.582,9.136-7.012,11.181-12.357c-5.632,2.427-11.882,2.702-17.752,0.748c-6.337-2.108-11.473-6.557-14.463-12.528C11.899,15.541,11.11,10.16,12.002,4.936z"/>
+        </svg>
+      </label>
       <span id="topbarAvatar"></span>
       <span class="dot" id="topbarDot"></span><span id="topbarName"></span>
     </div>
@@ -276,13 +319,6 @@ body.dragging{outline:3px dashed var(--blue);outline-offset:-3px}
       <div class="devices-count" id="devicesCount"></div>
     </div>
 
-    <div class="section" id="watchCard">
-      <h3>Auto-send a folder <span class="tagline" id="watchNote" style="margin:0"></span></h3>
-      <label style="margin-bottom:8px">Pick a folder below. Any new file added to it gets sent to your selected device automatically.</label>
-      <button class="btn btn-secondary" id="watchBtn" style="width:100%">Pick a folder</button>
-      <div class="devices-count" id="watchStatus"></div>
-    </div>
-
     <div class="footer-credit">made with &#10084;&#65039; by AD<br>&#169; 2026 AD. All rights reserved.</div>
   </aside>
 
@@ -301,8 +337,8 @@ body.dragging{outline:3px dashed var(--blue);outline-offset:-3px}
       <div class="drop-sub">Any file type &middot; No size limit</div>
     </div>
     <div class="pick-row">
-      <button class="btn btn-secondary pick-btn" id="pickFilesBtn" style="display:flex;align-items:center;justify-content:center;gap:6px"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>Choose files</button>
-      <button class="btn btn-secondary pick-btn" id="pickFolderBtn" style="display:flex;align-items:center;justify-content:center;gap:6px"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>Choose folder</button>
+      <button class="btn btn-primary pick-btn" id="pickFilesBtn" style="display:flex;align-items:center;justify-content:center;gap:6px"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>Choose files</button>
+      <button class="btn btn-primary pick-btn" id="pickFolderBtn" style="display:flex;align-items:center;justify-content:center;gap:6px"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>Choose folder</button>
     </div>
     <input type="file" id="fileInput" multiple class="hidden">
     <input type="file" id="folderInput" webkitdirectory class="hidden">
@@ -314,6 +350,12 @@ body.dragging{outline:3px dashed var(--blue);outline-offset:-3px}
   </main>
 
   <aside class="rightpanel">
+    <div class="section" id="watchCard">
+      <h3>Auto-send a folder <span class="tagline" id="watchNote" style="margin:0"></span></h3>
+      <label style="margin-bottom:8px">Pick a folder below. Any new file added to it gets sent to your selected device automatically.</label>
+      <button class="btn btn-secondary" id="watchBtn" style="width:100%">Pick a folder</button>
+      <div class="devices-count" id="watchStatus"></div>
+    </div>
     <div class="tabs">
       <button class="tab active" id="queueTab" onclick="switchTab('queue')">Queue <span class="tab-badge hidden" id="queueBadge"></span></button>
       <button class="tab" id="historyTab" onclick="switchTab('history')">History <span class="tab-badge hidden" id="historyBadge"></span></button>
@@ -326,17 +368,17 @@ body.dragging{outline:3px dashed var(--blue);outline-offset:-3px}
 </div>
 
 <script>
-const VERSION = 'v1.46';
+const VERSION = 'v1.47';
 document.getElementById('versionTag').textContent = 'version ' + VERSION.replace(/^v/, '');
 
 const themeToggle = document.getElementById('themeToggle');
 function applyTheme(theme) {
   document.documentElement.setAttribute('data-theme', theme);
-  themeToggle.innerHTML = theme === 'light' ? '&#9789;' : '&#9728;';
+  themeToggle.checked = theme === 'dark';
 }
 applyTheme(localStorage.getItem('theme') || 'dark');
-themeToggle.addEventListener('click', () => {
-  const next = document.documentElement.getAttribute('data-theme') === 'light' ? 'dark' : 'light';
+themeToggle.addEventListener('change', () => {
+  const next = themeToggle.checked ? 'dark' : 'light';
   localStorage.setItem('theme', next);
   applyTheme(next);
 });
