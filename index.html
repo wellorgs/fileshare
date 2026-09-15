@@ -56,6 +56,7 @@ input[type=text]::placeholder{color:var(--sub)}
 .dot.pending{background:var(--orange)}
 .dot.busy{background:var(--orange)}
 .dot.err{background:var(--red)}
+.dot.offline{background:var(--sub)}
 .hidden{display:none !important}
 
 /* ---- app shell: top bar + sidebar / workspace / queue+history ---- */
@@ -92,6 +93,8 @@ input[type=text]::placeholder{color:var(--sub)}
   border-radius:6px;cursor:pointer;border-left:2px solid transparent}
 .device-row:hover{background:rgba(255,255,255,.03)}
 .device-row.selected{background:rgba(31,111,235,.12);border-left-color:var(--blue)}
+.device-row.offline{opacity:.5;cursor:default}
+.device-row.offline:hover{background:none}
 .device-row .dot{flex:none}
 .device-row .device-meta{flex:1;overflow:hidden}
 .device-row .device-name{font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
@@ -327,7 +330,7 @@ body.dragging{outline:3px dashed var(--blue);outline-offset:-3px}
 </div>
 
 <script>
-const VERSION = 'v1.44';
+const VERSION = 'v1.45';
 document.getElementById('versionTag').textContent = 'version ' + VERSION.replace(/^v/, '');
 
 const themeToggle = document.getElementById('themeToggle');
@@ -507,18 +510,25 @@ function showIdentifyFlash() {
   setTimeout(() => el.remove(), 2000);
 }
 
+// Do Not Disturb is a hard block, not a warning: a DND device never shows
+// up as a valid send target, in single-select or broadcast mode. "All"
+// quietly skips DND devices rather than failing the whole send.
 function sendTargets() {
-  if (broadcastAll) return [...conns.values()].filter(t => t.conn.open);
+  if (broadcastAll) return [...conns.values()].filter(t => t.conn.open && !t.offline && t.status !== 'dnd');
   const t = selectedPeer && conns.get(selectedPeer);
-  return t && t.conn.open ? [t] : [];
+  return t && t.conn.open && !t.offline && t.status !== 'dnd' ? [t] : [];
 }
 
 function renderPeerList() {
   const box = document.getElementById('peerList');
   const countEl = document.getElementById('devicesCount');
   if (selectedPeer && !conns.has(selectedPeer)) selectedPeer = null;
-  if (!selectedPeer && conns.size) selectedPeer = [...conns.keys()][0];
-  countEl.textContent = conns.size ? conns.size + ' connected' : '';
+  if (!selectedPeer) {
+    const firstOnline = [...conns.entries()].find(([, e]) => !e.offline);
+    if (firstOnline) selectedPeer = firstOnline[0];
+  }
+  const online = onlineCount();
+  countEl.textContent = online ? online + ' connected' : '';
   document.getElementById('selectAllBtn').classList.toggle('active', broadcastAll);
   if (!conns.size) { box.innerHTML = '<div class="empty">none connected yet</div>'; renderTargetHeader(); return; }
   const filter = document.getElementById('deviceFilter').value.trim().toLowerCase();
@@ -526,12 +536,12 @@ function renderPeerList() {
   if (!matches.length) { box.innerHTML = '<div class="empty">no devices match</div>'; renderTargetHeader(); updateSendButton(); return; }
   box.innerHTML = '';
   for (const [peerId, entry] of matches) {
-    const { name, os, busy, status } = entry;
-    const selected = broadcastAll || peerId === selectedPeer;
-    const dotClass = busy ? 'busy' : STATUS_DOT[status || 'available'];
-    const subLabel = busy ? 'transferring' : STATUS_LABELS[status || 'available'];
+    const { name, os, busy, status, offline } = entry;
+    const selected = (broadcastAll || peerId === selectedPeer) && !offline;
+    const dotClass = offline ? 'offline' : busy ? 'busy' : STATUS_DOT[status || 'available'];
+    const subLabel = offline ? 'offline' : busy ? 'transferring' : STATUS_LABELS[status || 'available'];
     const row = document.createElement('div');
-    row.className = 'device-row' + (selected ? ' selected' : '');
+    row.className = 'device-row' + (selected ? ' selected' : '') + (offline ? ' offline' : '');
     row.innerHTML =
       avatarHTML(entry) +
       `<div class="device-meta"><div class="device-name">${name}</div>` +
@@ -539,7 +549,7 @@ function renderPeerList() {
       `<button class="identify-btn" title="Flash that device's screen">${ICON.flash}</button>` +
       `<span class="dot ${dotClass}"></span>` +
       (selected ? '<span class="chevron">&#8250;</span>' : '');
-    row.onclick = () => { broadcastAll = false; selectedPeer = peerId; renderPeerList(); };
+    row.onclick = () => { if (offline) return; broadcastAll = false; selectedPeer = peerId; renderPeerList(); };
     row.querySelector('.identify-btn').onclick = (e) => { e.stopPropagation(); sendIdentify(peerId); };
     box.appendChild(row);
   }
@@ -620,7 +630,8 @@ function renderTargetHeader() {
   header.classList.remove('hidden');
   avatarEl.innerHTML = avatarHTML(entry);
   document.getElementById('targetName').textContent = entry.name;
-  document.getElementById('targetSub').textContent = (entry.os || '?') + ' · ' + (entry.busy ? 'transferring' : STATUS_LABELS[entry.status || 'available']);
+  const subLabel = entry.offline ? 'offline' : entry.busy ? 'transferring' : STATUS_LABELS[entry.status || 'available'];
+  document.getElementById('targetSub').textContent = (entry.os || '?') + ' · ' + subLabel;
   document.getElementById('targetBusyPill').classList.toggle('hidden', !entry.busy);
 }
 
@@ -643,6 +654,11 @@ function randomCode() { return String(Math.floor(100000 + Math.random() * 900000
 function resetPeer() {
   if (peer) { try { peer.destroy(); } catch (err) { /* already gone */ } }
   peer = null;
+  // Leaving one room and starting/joining another leaves every previous
+  // peer behind otherwise - now that a disconnected device stays visible
+  // as an offline row (instead of just vanishing) that staleness would
+  // actually show up as ghost devices from a room that's no longer live.
+  conns.clear();
 }
 
 function createRoom() {
@@ -775,15 +791,34 @@ function handleLargeFileStart(conn, entry, msg) {
 // establish the connection (room codes, ICE/NAT traversal); all real
 // traffic goes straight over the underlying RTCDataChannel, bypassing
 // PeerJS's serializer entirely.
+function onlineCount() { return [...conns.values()].filter(e => !e.offline).length; }
+
 function addConn(conn) {
   const meta = conn.metadata || {};
-  const entry = { conn, name: meta.name || 'a device', os: meta.os || null, avatar: meta.avatar || null, status: meta.status || 'available' };
+  const name = meta.name || 'a device';
+  // A reconnect gets a brand-new random PeerJS id every time, so without
+  // this it'd show up as a second "offline" ghost row for the same
+  // physical device instead of the existing row coming back online.
+  // Matching on name is the same trick resumePendingSendsTo already uses.
+  const stale = [...conns.entries()].find(([, e]) => e.offline && e.name === name);
+  let entry;
+  if (stale) {
+    conns.delete(stale[0]);
+    entry = stale[1];
+    entry.conn = conn;
+    entry.offline = false;
+    entry.os = meta.os || entry.os;
+    entry.avatar = meta.avatar || entry.avatar;
+    entry.status = meta.status || entry.status;
+  } else {
+    entry = { conn, name, os: meta.os || null, avatar: meta.avatar || null, status: meta.status || 'available' };
+  }
   conns.set(conn.peer, entry);
   conn.on('open', () => {
     const dc = conn.dataChannel;
     dc.binaryType = 'arraybuffer';
     dc.send(JSON.stringify(helloPayload()));
-    setStatus(conns.size + ' device' + (conns.size > 1 ? 's' : '') + ' connected', 'live');
+    setStatus(onlineCount() + ' device' + (onlineCount() > 1 ? 's' : '') + ' connected', 'live');
     renderPeerList();
 
     // The browser fires 'message' events as packets arrive, without waiting
@@ -855,9 +890,11 @@ function addConn(conn) {
     };
   });
   conn.on('close', () => {
-    conns.delete(conn.peer);
+    entry.offline = true;
+    entry.busy = false;
     renderPeerList();
-    setStatus(conns.size ? conns.size + ' device' + (conns.size > 1 ? 's' : '') + ' connected' : 'disconnected', conns.size ? 'live' : 'err');
+    const n = onlineCount();
+    setStatus(n ? n + ' device' + (n > 1 ? 's' : '') + ' connected' : 'disconnected', n ? 'live' : 'err');
   });
   conn.on('error', err => console.error('connection error', err));
 }
@@ -1168,7 +1205,8 @@ function updateSendButton() {
     totalEl.textContent = fmtSize(queue.reduce((n, f) => n + f.size, 0)) + ' total';
     totalEl.classList.remove('hidden');
   } else {
-    btn.textContent = 'Send files';
+    const single = !broadcastAll && selectedPeer && conns.get(selectedPeer);
+    btn.textContent = single && single.status === 'dnd' ? single.name + ' is Do Not Disturb' : 'Send files';
     totalEl.classList.add('hidden');
   }
 }
