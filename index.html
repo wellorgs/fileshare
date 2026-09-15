@@ -213,7 +213,7 @@ body.dragging{outline:3px dashed var(--blue);outline-offset:-3px}
   <div class="panels">
 
   <aside class="sidebar">
-    <p class="tagline" style="margin-bottom:4px">Direct device-to-device. Nothing touches a server.</p>
+    <p class="tagline" style="margin-bottom:4px">Direct device-to-device, end-to-end encrypted (WebRTC/DTLS). Falls back to a relay automatically if devices aren't on the same network.</p>
 
     <div class="section">
       <h3>Your name</h3>
@@ -264,6 +264,12 @@ body.dragging{outline:3px dashed var(--blue);outline-offset:-3px}
       <div class="devices-count" id="devicesCount"></div>
     </div>
 
+    <div class="section" id="watchCard">
+      <h3>Watch folder <span class="tagline" id="watchNote" style="margin:0"></span></h3>
+      <button class="btn btn-secondary" id="watchBtn" style="width:100%">Choose folder to watch</button>
+      <div class="devices-count" id="watchStatus"></div>
+    </div>
+
     <div class="footer-credit">made with &#10084;&#65039; by AD</div>
   </aside>
 
@@ -302,7 +308,7 @@ body.dragging{outline:3px dashed var(--blue);outline-offset:-3px}
 </div>
 
 <script>
-const VERSION = 'v37';
+const VERSION = 'v38';
 document.getElementById('versionTag').textContent = '· ' + VERSION;
 
 const themeToggle = document.getElementById('themeToggle');
@@ -496,6 +502,58 @@ document.getElementById('deviceFilter').addEventListener('input', renderPeerList
 document.getElementById('refreshDevices').addEventListener('click', () => { broadcastHello(); renderPeerList(); });
 document.getElementById('selectAllBtn').addEventListener('click', () => { broadcastAll = !broadcastAll; renderPeerList(); });
 
+// ---- watch folder: auto-sync new files to whatever's currently selected
+// as the send target (single device or "All") ----
+//
+// No OS-level filesystem-watch API exists in a browser - only the File
+// System Access API's directory handle, and no native change-notification
+// on it either, so this polls the folder listing on an interval and diffs
+// against what it already knows about. Chrome/Edge only (no Firefox,
+// Safari): feature-detected below rather than shimmed.
+let watchHandle = null, watchTimer = null;
+let watchSeen = new Set();
+const watchBtn = document.getElementById('watchBtn');
+const watchStatus = document.getElementById('watchStatus');
+if (!window.showDirectoryPicker) {
+  watchBtn.disabled = true;
+  document.getElementById('watchNote').textContent = '(Chrome/Edge only)';
+}
+async function scanWatchFolder() {
+  if (!watchHandle) return;
+  const targets = sendTargets();
+  const fresh = [];
+  for await (const [name, handle] of watchHandle.entries()) {
+    if (handle.kind !== 'file' || watchSeen.has(name)) continue;
+    watchSeen.add(name);
+    if (targets.length) fresh.push(await handle.getFile());
+  }
+  if (!fresh.length) return;
+  queue.push(...fresh);
+  renderQueue();
+  watchStatus.textContent = 'watching "' + watchHandle.name + '" · syncing ' + fresh.length + ' new file' + (fresh.length > 1 ? 's' : '') + '...';
+  document.getElementById('sendBtn').click();
+}
+watchBtn.addEventListener('click', async () => {
+  if (watchTimer) {
+    clearInterval(watchTimer); watchTimer = null; watchHandle = null;
+    watchBtn.textContent = 'Choose folder to watch';
+    watchStatus.textContent = '';
+    return;
+  }
+  try {
+    watchHandle = await window.showDirectoryPicker();
+  } catch (err) { return; } // user cancelled the picker
+  // Seed with what's already there - only files that show up AFTER this
+  // point count as "new" and get synced.
+  watchSeen = new Set();
+  for await (const [name, handle] of watchHandle.entries()) {
+    if (handle.kind === 'file') watchSeen.add(name);
+  }
+  watchBtn.textContent = 'Stop watching';
+  watchStatus.textContent = 'watching "' + watchHandle.name + '" for new files...';
+  watchTimer = setInterval(scanWatchFolder, 4000);
+});
+
 function renderTargetHeader() {
   const header = document.getElementById('targetHeader');
   const avatarEl = document.getElementById('targetAvatar');
@@ -613,20 +671,36 @@ function addConn(conn) {
             entry.avatar = msg.avatar || null;
             entry.status = msg.status || 'available';
             renderPeerList();
+            resumePendingSendsTo(entry, conn);
           } else if (msg.type === 'file-start') {
             entry.busy = true;
             renderPeerList();
-            addPendingRow(msg.name, entry.name);
-            conn._incoming = startIncoming(msg.name, msg.size, entry.name, msg.sha256);
+            // pendingReceive is keyed by device NAME (not this conn's peerId,
+            // which changes every reconnect) so a partial receive survives a
+            // dropped connection - matching sha256 means "same logical file,
+            // keep appending" instead of starting over from byte 0.
+            const key = entry.name + '|' + msg.name;
+            let pending = pendingReceive.get(key);
+            if (!pending || pending.expectedHash !== msg.sha256) {
+              pending = { chunks: [], receivedBytes: 0, expectedHash: msg.sha256 };
+              pendingReceive.set(key, pending);
+            }
+            if (!pendingRows.has(key)) addPendingRow(msg.name, entry.name);
+            conn._incoming = startIncoming(msg.name, msg.size, entry.name, msg.sha256, pending);
+            dc.send(JSON.stringify({ type: 'file-ack', name: msg.name, offset: pending.receivedBytes }));
           } else if (msg.type === 'file-end' && conn._incoming) {
             const name = conn._incoming.name;
             const verified = await conn._incoming.finish();
+            pendingReceive.delete(entry.name + '|' + name);
             dc.send(JSON.stringify({ type: 'delivered', name, verified }));
             conn._incoming = null;
             entry.busy = false;
             renderPeerList();
           } else if (msg.type === 'delivered') {
             markDelivered(conn.peer, msg.name, msg.verified);
+          } else if (msg.type === 'file-ack') {
+            const resolve = pendingAcks.get(conn.peer + '|' + msg.name);
+            if (resolve) resolve(msg.offset);
           }
         } else if (conn._incoming) {
           await conn._incoming.write(e.data);
@@ -664,11 +738,16 @@ async function sha256Hex(buffer) {
   return [...new Uint8Array(digest)].map(b => b.toString(16).padStart(2, '0')).join('');
 }
 
-function startIncoming(name, size, fromName, expectedHash) {
-  const chunks = [];
+// Keyed by "fromName|path" (not conn.peer, which changes on reconnect) so a
+// partial receive survives a dropped connection - see the file-start
+// handler in addConn, which matches on this plus a matching sha256.
+const pendingReceive = new Map();
+
+function startIncoming(name, size, fromName, expectedHash, pending) {
+  const chunks = pending.chunks;
   return {
     name,
-    write: (chunk) => { chunks.push(chunk); },
+    write: (chunk) => { chunks.push(chunk); pending.receivedBytes += chunk.byteLength; },
     finish: async () => {
       const blob = new Blob(chunks);
       const verified = expectedHash ? (await sha256Hex(await blob.arrayBuffer())) === expectedHash : null;
@@ -864,7 +943,7 @@ function markSent(peerId, name) {
 // place, matching how the reference design separates the two tabs.
 function moveToHistory(entry) {
   entry.row.querySelector('.progress')?.remove();
-  entry.resendBtn.classList.remove('hidden');
+  if (entry.file) entry.resendBtn.classList.remove('hidden');
   entry.row.remove();
   const list = document.getElementById('historyList');
   if (list.querySelector('.empty')) list.innerHTML = '';
@@ -1003,33 +1082,86 @@ const CHUNK = 16 * 1024;
 // naturally shows "MyFolder/photo.jpg" and Chrome recreates the subfolder
 // under Downloads on save (a "/" in a download's suggested filename does
 // that automatically - no directory-picker or extra protocol needed).
-// Reads the whole file once (already the app's documented tradeoff for
-// files up to ~1-2GB, see startIncoming above) - one pass both hashes it
-// for the receiver's corruption check and feeds the chunked send loop,
-// instead of a stream reader plus a separate hashing pass.
-async function sendFileTo(conn, file, toName) {
-  const dc = conn.dataChannel;
+// ---- resumable sending ----
+//
+// pendingResume is keyed by "toName|path" (name, not peerId - a reconnect
+// gets a fresh random PeerJS id) and holds the full original bytes plus
+// their hash, so a retry after a dropped connection can renegotiate from
+// wherever the RECEIVER says it actually got to - see the file-ack
+// handshake below. This only survives within the current tab session (the
+// buffer lives in memory, same ceiling as everything else in this app); a
+// full page reload loses it like any in-flight state.
+const pendingResume = new Map();
+const pendingAcks = new Map(); // "peerId|path" -> resolve(offset)
+
+function waitForAck(peerId, path, timeoutMs) {
+  const key = peerId + '|' + path;
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => { pendingAcks.delete(key); reject(new Error('no response')); }, timeoutMs);
+    pendingAcks.set(key, (offset) => { clearTimeout(timer); pendingAcks.delete(key); resolve(offset); });
+  });
+}
+
+async function prepareForSend(file) {
   const path = file.webkitRelativePath || file.name;
-  markSending(conn.peer, path);
   const buf = await file.arrayBuffer();
   const hash = await sha256Hex(buf);
-  dc.send(JSON.stringify({ type: 'file-start', name: path, size: file.size, sha256: hash }));
+  return { path, buf, hash };
+}
+
+// Every send starts with a file-start/file-ack round trip, even for a
+// brand-new file (receiver just answers offset 0 immediately) - one extra
+// RTT is nothing next to transferring the bytes, and it means resuming a
+// dropped transfer is the exact same code path as starting one, not a
+// special case bolted on top.
+async function sendPreparedFile(conn, prepared, toName) {
+  const dc = conn.dataChannel;
+  const { path, buf, hash } = prepared;
+  markSending(conn.peer, path);
+  let startOffset;
+  try {
+    dc.send(JSON.stringify({ type: 'file-start', name: path, size: buf.byteLength, sha256: hash }));
+    startOffset = await waitForAck(conn.peer, path, 15000);
+  } catch (err) {
+    pendingResume.set(toName + '|' + path, prepared);
+    throw new Error(toName + ' is not responding - will retry automatically once reconnected');
+  }
   const startTime = performance.now();
-  let sent = 0;
-  for (let off = 0; off < buf.byteLength; off += CHUNK) {
-    const slice = buf.slice(off, off + CHUNK);
-    while (dc.bufferedAmount > 8 * 1024 * 1024) {
-      await new Promise(r => setTimeout(r, 20));
+  let sent = startOffset;
+  try {
+    for (let off = startOffset; off < buf.byteLength; off += CHUNK) {
+      if (dc.readyState !== 'open') throw new Error('connection dropped');
+      const slice = buf.slice(off, off + CHUNK);
+      while (dc.bufferedAmount > 8 * 1024 * 1024) {
+        if (dc.readyState !== 'open') throw new Error('connection dropped');
+        await new Promise(r => setTimeout(r, 20));
+      }
+      dc.send(slice);
+      sent += slice.byteLength;
+      const elapsed = (performance.now() - startTime) / 1000;
+      const speed = elapsed > 0 ? (sent - startOffset) / elapsed : 0;
+      const eta = speed > 0 ? (buf.byteLength - sent) / speed : 0;
+      markProgress(conn.peer, path, buf.byteLength ? sent / buf.byteLength : 1, speed, eta);
     }
-    dc.send(slice);
-    sent += slice.byteLength;
-    const elapsed = (performance.now() - startTime) / 1000;
-    const speed = elapsed > 0 ? sent / elapsed : 0;
-    const eta = speed > 0 ? (buf.byteLength - sent) / speed : 0;
-    markProgress(conn.peer, path, buf.byteLength ? sent / buf.byteLength : 1, speed, eta);
+  } catch (err) {
+    pendingResume.set(toName + '|' + path, prepared);
+    throw new Error('connection to ' + toName + ' dropped - will resume automatically once reconnected');
   }
   dc.send(JSON.stringify({ type: 'file-end' }));
   markSent(conn.peer, path);
+  pendingResume.delete(toName + '|' + path);
+}
+
+// Called whenever a device's hello arrives (fresh connect or reconnect) -
+// if it's still owed a file from before, pick up where the receiver says
+// it left off, with no user action needed.
+function resumePendingSendsTo(entry, conn) {
+  for (const [key, prepared] of [...pendingResume]) {
+    if (!key.startsWith(entry.name + '|')) continue;
+    pendingResume.delete(key);
+    addSentRow(conn.peer, prepared.path, prepared.buf.byteLength, entry.name, null);
+    sendPreparedFile(conn, prepared, entry.name).catch(err => markFailed(conn.peer, prepared.path, err.message));
+  }
 }
 
 async function sendQueueToTarget(target, toSend) {
@@ -1038,7 +1170,8 @@ async function sendQueueToTarget(target, toSend) {
   for (const file of toSend) {
     const path = file.webkitRelativePath || file.name;
     try {
-      await sendFileTo(target.conn, file, target.name);
+      const prepared = await prepareForSend(file);
+      await sendPreparedFile(target.conn, prepared, target.name);
     } catch (err) {
       markFailed(target.conn.peer, path, err.message);
     }
