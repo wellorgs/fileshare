@@ -25,6 +25,23 @@
 *::-webkit-scrollbar-track{background:transparent}
 *::-webkit-scrollbar-thumb{background:var(--orange);border-radius:10px}
 *::-webkit-scrollbar-thumb:hover{background:var(--blue)}
+
+/* ---- curved scroll indicator (Jhey Tompkins' "curved scroller" technique,
+   adapted): an SVG path with rounded caps sits pinned to the top of each
+   scrollable panel via position:sticky, height:0 so it takes no layout
+   space. A thumb segment (stroke-dasharray/dashoffset) slides along it in
+   sync with scroll via the native ScrollTimeline API. Chrome/Edge only
+   (needs the Scroll-linked Animations API) - other browsers just keep the
+   plain accent scrollbar above as a fallback, no JS animation library
+   needed either way. */
+.curved-scroll-active{scrollbar-width:none}
+.curved-scroll-active::-webkit-scrollbar{display:none}
+.curved-bar{display:block;position:sticky;top:0;left:0;height:0;min-height:0;overflow:visible;
+  width:100%;align-self:stretch;pointer-events:none;z-index:3}
+.curved-bar svg{position:absolute;top:0;right:2px}
+.curved-bar path{stroke-width:var(--stroke-width,3)}
+.curved-bar__track{stroke:var(--border)}
+.curved-bar__thumb{stroke:var(--orange)}
 body{
   margin:0; min-height:100vh; background:var(--bg); color:var(--text);
   font-family:var(--font-sans); font-size:16px;
@@ -402,7 +419,7 @@ body.dragging{outline:3px dashed var(--blue);outline-offset:-3px}
 </div>
 
 <script>
-const VERSION = 'v1.51';
+const VERSION = 'v1.52';
 document.getElementById('versionTag').textContent = 'version ' + VERSION.replace(/^v/, '');
 
 const themeToggle = document.getElementById('themeToggle');
@@ -1590,5 +1607,67 @@ if (urlCode) {
   document.getElementById('joinCode').value = urlCode;
   joinRoom(urlCode);
 }
+
+// ---- curved scroll indicator ----
+//
+// Adapted from Jhey Tompkins' "curved scroller" technique: an SVG path with
+// rounded caps sits pinned to the top of a scrollable panel via
+// position:sticky (see .curved-bar - height:0 so it takes no layout space,
+// overflow:visible so the tall path still renders). A short thumb segment
+// (stroke-dasharray + an animated stroke-dashoffset) slides along that path
+// in sync with the panel's own scroll position via the native ScrollTimeline
+// API - no scroll event listeners, no animation library. Chrome/Edge only
+// (needs the Scroll-linked Animations API); everywhere else just keeps the
+// plain orange ::-webkit-scrollbar defined above as a fallback.
+function attachCurvedScrollbar(el, opts) {
+  if (!el || typeof ScrollTimeline !== 'function') return;
+  const cfg = Object.assign({ radius: 8, stroke: 3, inset: 3, trail: 6, thumb: 34, finish: 3, offsetEnd: 4 }, opts);
+  const wrap = document.createElement('div');
+  wrap.className = 'curved-bar';
+  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  svg.innerHTML = '<path class="curved-bar__track" fill="none" stroke-linecap="round"></path>' +
+                   '<path class="curved-bar__thumb" fill="none" stroke-linecap="round"></path>';
+  wrap.appendChild(svg);
+  el.prepend(wrap);
+  el.classList.add('curved-scroll-active');
+  const track = svg.querySelector('.curved-bar__track');
+  const thumb = svg.querySelector('.curved-bar__thumb');
+  svg.style.setProperty('--stroke-width', cfg.stroke);
+
+  function sync() {
+    const h = el.clientHeight;
+    if (h < 20) return; // hidden tab / not laid out yet - nothing sane to draw
+    const mid = cfg.radius;
+    const innerRad = Math.max(0, cfg.radius - (cfg.inset + cfg.stroke * 0.5));
+    const padTop = cfg.inset + cfg.stroke * 0.5;
+    const padLeft = cfg.radius * 2 - padTop;
+    svg.setAttribute('width', cfg.radius * 2);
+    svg.setAttribute('height', h);
+    svg.setAttribute('viewBox', `0 0 ${cfg.radius * 2} ${h}`);
+    // top hook: short horizontal lead-in, then curve down into the track
+    let d = `M${mid - cfg.trail},${padTop} L${mid},${padTop} a${innerRad},${innerRad} 0 0 1 ${innerRad} ${innerRad}`;
+    thumb.setAttribute('d', d);
+    const cornerLength = Math.ceil(thumb.getTotalLength());
+    // straight run down the right edge, then mirror the hook at the bottom
+    d += ` L${padLeft},${h - (cfg.inset + cfg.stroke * 0.5 + innerRad)}` +
+         ` a${innerRad},${innerRad} 0 0 1 ${-innerRad} ${innerRad}` +
+         ` L${mid - cfg.trail},${h - (cfg.inset + cfg.stroke * 0.5)}`;
+    thumb.setAttribute('d', d);
+    track.setAttribute('d', d);
+    const trackLen = Math.ceil(track.getTotalLength());
+    thumb.style.strokeDasharray = `${cfg.thumb} ${trackLen}`;
+    thumb.getAnimations().forEach(a => a.cancel());
+    thumb.animate([
+      { strokeDashoffset: cfg.thumb - cfg.finish - cfg.offsetEnd },
+      { strokeDashoffset: -(cornerLength - 4) },
+      { strokeDashoffset: -(trackLen - cornerLength - cfg.thumb + 4) },
+      { strokeDashoffset: -(trackLen - cfg.finish - cfg.offsetEnd) },
+    ], { timeline: new ScrollTimeline({ source: el, axis: 'block' }), fill: 'both', easing: 'linear' });
+  }
+  new ResizeObserver(sync).observe(el);
+  sync();
+}
+[document.querySelector('.sidebar'), document.querySelector('.workspace'), document.getElementById('stagingList'),
+ document.getElementById('activeList'), document.getElementById('historyList')].forEach(el => attachCurvedScrollbar(el));
 </script>
 </body></html>
