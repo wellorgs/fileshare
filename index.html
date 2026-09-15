@@ -99,6 +99,12 @@ input[type=text]::placeholder{color:var(--sub)}
 .device-row .device-sub{font-size:10px;color:var(--sub);display:flex;align-items:center;gap:5px;
   font-family:var(--font-sans);margin-top:2px}
 .device-row .chevron{flex:none;font-size:13px;opacity:.7}
+.identify-btn{flex:none;border:none;background:none;color:var(--sub);cursor:pointer;
+  padding:4px;line-height:1;border-radius:5px;display:flex}
+.identify-btn:hover{background:var(--panel);color:var(--orange)}
+.identify-flash{position:fixed;inset:0;background:var(--blue);opacity:0;pointer-events:none;
+  z-index:9999;animation:identifyPulse .5s ease-in-out 4}
+@keyframes identifyPulse{0%,100%{opacity:0}50%{opacity:.35}}
 .avatar{width:24px;height:24px;border-radius:50%;background:var(--blue);color:#fff;
   font-size:11px;font-weight:600;display:flex;align-items:center;justify-content:center;flex:none;object-fit:cover}
 .os-badge{font-size:9px;font-weight:500;color:var(--sub);background:var(--panel);
@@ -308,7 +314,7 @@ body.dragging{outline:3px dashed var(--blue);outline-offset:-3px}
 </div>
 
 <script>
-const VERSION = 'v39';
+const VERSION = 'v40';
 document.getElementById('versionTag').textContent = '· ' + VERSION;
 
 const themeToggle = document.getElementById('themeToggle');
@@ -347,6 +353,7 @@ const ICON = {
   clock: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>',
   check: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="8 12 11 15 16 9"/></svg>',
   fail: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>',
+  flash: '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>',
 };
 
 let peer;
@@ -474,6 +481,18 @@ function broadcastHello() {
 // over each device's own dataChannel (still one file-in-flight per
 // connection at a time, just fanned out across connections in parallel).
 let broadcastAll = false;
+
+function sendIdentify(peerId) {
+  const target = conns.get(peerId);
+  if (target && target.conn.open) target.conn.dataChannel.send(JSON.stringify({ type: 'identify' }));
+}
+function showIdentifyFlash() {
+  const el = document.createElement('div');
+  el.className = 'identify-flash';
+  document.body.appendChild(el);
+  setTimeout(() => el.remove(), 2000);
+}
+
 function sendTargets() {
   if (broadcastAll) return [...conns.values()].filter(t => t.conn.open);
   const t = selectedPeer && conns.get(selectedPeer);
@@ -503,9 +522,11 @@ function renderPeerList() {
       avatarHTML(entry) +
       `<div class="device-meta"><div class="device-name">${name}</div>` +
       `<div class="device-sub"><span class="os-badge">${os || '?'}</span>${subLabel}</div></div>` +
+      `<button class="identify-btn" title="Flash that device's screen">${ICON.flash}</button>` +
       `<span class="dot ${dotClass}"></span>` +
       (selected ? '<span class="chevron">&#8250;</span>' : '');
     row.onclick = () => { broadcastAll = false; selectedPeer = peerId; renderPeerList(); };
+    row.querySelector('.identify-btn').onclick = (e) => { e.stopPropagation(); sendIdentify(peerId); };
     box.appendChild(row);
   }
   renderTargetHeader();
@@ -714,6 +735,8 @@ function addConn(conn) {
           } else if (msg.type === 'file-ack') {
             const resolve = pendingAcks.get(conn.peer + '|' + msg.name);
             if (resolve) resolve(msg.offset);
+          } else if (msg.type === 'identify') {
+            showIdentifyFlash();
           }
         } else if (conn._incoming) {
           await conn._incoming.write(e.data);
