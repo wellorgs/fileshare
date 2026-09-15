@@ -64,7 +64,7 @@ input[type=text]::placeholder{color:var(--sub)}
   background:var(--panel);border-bottom:1px solid var(--border);flex:none}
 .topbar-brand{display:flex;align-items:center;gap:8px}
 .brand-logo{height:36px;width:auto;flex:none}
-.topbar .tagline{margin:0}
+.topbar .tagline{margin:0;align-self:flex-end;padding-bottom:2px}
 .topbar-me{display:flex;align-items:center;gap:7px;font-family:var(--font-sans);font-size:11px;color:var(--sub)}
 .panels{display:flex;flex-direction:column;flex:1;min-height:0}
 .sidebar,.rightpanel{padding:16px;display:flex;flex-direction:column;gap:12px}
@@ -277,7 +277,7 @@ body.dragging{outline:3px dashed var(--blue);outline-offset:-3px}
       <div class="devices-count" id="watchStatus"></div>
     </div>
 
-    <div class="footer-credit">made with &#10084;&#65039; by AD</div>
+    <div class="footer-credit">made with &#10084;&#65039; by AD<br>&#169; 2026 AD. All rights reserved.</div>
   </aside>
 
   <main class="workspace">
@@ -294,9 +294,7 @@ body.dragging{outline:3px dashed var(--blue);outline-offset:-3px}
       <div class="drop-title">Drop files here or click to browse</div>
       <div class="drop-sub">Any file type &middot; No size limit</div>
     </div>
-    <button class="btn btn-secondary" id="pickFolderBtn" style="width:100%">Or choose a whole folder to send</button>
     <input type="file" id="fileInput" multiple class="hidden">
-    <input type="file" id="folderInput" webkitdirectory class="hidden">
     <div id="stagingList" class="tabpanel"></div>
     <div class="workspace-actions">
       <button class="btn btn-primary" id="sendBtn" disabled>Send files</button>
@@ -317,8 +315,8 @@ body.dragging{outline:3px dashed var(--blue);outline-offset:-3px}
 </div>
 
 <script>
-const VERSION = 'v1.42';
-document.getElementById('versionTag').textContent = '· ' + VERSION;
+const VERSION = 'v1.43';
+document.getElementById('versionTag').textContent = 'version ' + VERSION.replace(/^v/, '');
 
 const themeToggle = document.getElementById('themeToggle');
 function applyTheme(theme) {
@@ -1474,12 +1472,6 @@ document.getElementById('fileInput').addEventListener('change', e => {
   addToQueue([...e.target.files]);
   e.target.value = '';
 });
-document.getElementById('folderInput').addEventListener('change', e => {
-  addToQueue([...e.target.files]);
-  e.target.value = '';
-});
-document.getElementById('pickFolderBtn').addEventListener('click', () => document.getElementById('folderInput').click());
-
 // auto-join if opened from a QR code / shared link
 const urlCode = new URLSearchParams(location.search).get('code');
 if (urlCode) {
