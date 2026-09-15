@@ -139,6 +139,13 @@ input[type=text]::placeholder{color:var(--sub)}
 #drop.over{border-color:var(--blue);background:rgba(31,111,235,.06)}
 .drop-title{font-size:13px;color:var(--text)}
 .drop-sub{font-size:11px;color:var(--sub)}
+.pick-row{display:flex;gap:8px;flex:none}
+.pick-btn{flex:1;display:flex;align-items:center;justify-content:center;gap:6px;
+  padding:9px 12px;border-radius:20px;border:1px solid var(--border);
+  background:var(--card);color:var(--text);font-size:12px;font-weight:500;
+  cursor:pointer;font-family:var(--font-sans);transition:.15s}
+.pick-btn:hover{border-color:var(--blue);color:var(--blue)}
+.pick-btn svg{flex:none}
 body.dragging{outline:3px dashed var(--blue);outline-offset:-3px}
 /* Natural height, capped - stays compact for a few files (the Send button
    sits right below it, not pinned to the bottom of the page) and scrolls
@@ -289,12 +296,17 @@ body.dragging{outline:3px dashed var(--blue);outline-offset:-3px}
       </div>
       <span class="busy-pill hidden" id="targetBusyPill">busy &mdash; may be slower</span>
     </div>
-    <div id="drop" onclick="document.getElementById('fileInput').click()">
+    <div id="drop">
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-      <div class="drop-title">Drop files here or click to browse</div>
+      <div class="drop-title">Drag files or a folder here</div>
       <div class="drop-sub">Any file type &middot; No size limit</div>
     </div>
+    <div class="pick-row">
+      <button class="pick-btn" id="pickFilesBtn"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>Choose files</button>
+      <button class="pick-btn" id="pickFolderBtn"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>Choose folder</button>
+    </div>
     <input type="file" id="fileInput" multiple class="hidden">
+    <input type="file" id="folderInput" webkitdirectory class="hidden">
     <div id="stagingList" class="tabpanel"></div>
     <div class="workspace-actions">
       <button class="btn btn-primary" id="sendBtn" disabled>Send files</button>
@@ -315,7 +327,7 @@ body.dragging{outline:3px dashed var(--blue);outline-offset:-3px}
 </div>
 
 <script>
-const VERSION = 'v1.43';
+const VERSION = 'v1.44';
 document.getElementById('versionTag').textContent = 'version ' + VERSION.replace(/^v/, '');
 
 const themeToggle = document.getElementById('themeToggle');
@@ -1459,9 +1471,9 @@ document.addEventListener('drop', async e => {
     // A stalled directory read (a permission hiccup, a callback that never
     // fires) would otherwise just hang forever with no feedback - it'd look
     // exactly like "nothing happened" rather than a visible error.
-    const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error('timed out reading the dropped item(s) - try again, or click the drop zone to browse instead')), 20000));
+    const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error('timed out reading the dropped item(s) - try again, or use Choose files/Choose folder instead')), 20000));
     const files = await Promise.race([filesFromDrop(e.dataTransfer), timeout]);
-    if (!files.length) { alert("Couldn't read anything from that drop - try again, or click the drop zone to browse."); return; }
+    if (!files.length) { alert("Couldn't read anything from that drop - try again, or use Choose files/Choose folder."); return; }
     addToQueue(files);
   } catch (err) {
     alert('Reading the dropped item failed: ' + err.message);
@@ -1472,6 +1484,13 @@ document.getElementById('fileInput').addEventListener('change', e => {
   addToQueue([...e.target.files]);
   e.target.value = '';
 });
+document.getElementById('folderInput').addEventListener('change', e => {
+  addToQueue([...e.target.files]);
+  e.target.value = '';
+});
+document.getElementById('pickFilesBtn').addEventListener('click', () => document.getElementById('fileInput').click());
+document.getElementById('pickFolderBtn').addEventListener('click', () => document.getElementById('folderInput').click());
+
 // auto-join if opened from a QR code / shared link
 const urlCode = new URLSearchParams(location.search).get('code');
 if (urlCode) {
