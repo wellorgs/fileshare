@@ -62,11 +62,14 @@ input[type=text]::placeholder{color:var(--sub)}
 /* ---- app shell: top bar + sidebar / workspace / queue+history ---- */
 .app{display:flex;flex-direction:column;min-height:100vh}
 .topbar{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;
-  background:var(--panel);border-bottom:1px solid var(--border);flex:none}
-.topbar-brand{display:flex;align-items:center;gap:8px}
+  background:var(--panel);border-bottom:1px solid var(--border);flex:none;
+  flex-wrap:wrap;row-gap:8px}
+.topbar-brand{display:flex;align-items:center;gap:8px;min-width:0}
 .brand-logo{height:36px;width:auto;flex:none}
-.topbar .tagline{margin:0;align-self:flex-end;padding-bottom:2px}
-.topbar-me{display:flex;align-items:center;gap:7px;font-family:var(--font-sans);font-size:11px;color:var(--sub)}
+.topbar .tagline{margin:0;align-self:flex-end;padding-bottom:2px;white-space:nowrap}
+.topbar-me{display:flex;align-items:center;gap:7px;font-family:var(--font-sans);
+  font-size:11px;color:var(--sub);flex:none;margin-left:auto}
+#topbarName{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:140px}
 .panels{display:flex;flex-direction:column;flex:1;min-height:0}
 .sidebar,.rightpanel{padding:16px;display:flex;flex-direction:column;gap:12px}
 .sidebar{background:var(--panel);border-bottom:1px solid var(--border)}
@@ -224,6 +227,8 @@ body.dragging{outline:3px dashed var(--blue);outline-offset:-3px}
    the drop zone actually fills the screen instead of a small box. */
 @media (max-width:899px){
   .workspace{min-height:70vh}
+  /* 16px stops iOS Safari auto-zooming the page when an input gets focus */
+  input[type=text]{font-size:16px}
 }
 </style></head>
 <body>
@@ -338,10 +343,8 @@ body.dragging{outline:3px dashed var(--blue);outline-offset:-3px}
     </div>
     <div class="pick-row">
       <button class="btn btn-primary pick-btn" id="pickFilesBtn" style="display:flex;align-items:center;justify-content:center;gap:6px"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>Choose files</button>
-      <button class="btn btn-primary pick-btn" id="pickFolderBtn" style="display:flex;align-items:center;justify-content:center;gap:6px"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>Choose folder</button>
     </div>
     <input type="file" id="fileInput" multiple class="hidden">
-    <input type="file" id="folderInput" webkitdirectory class="hidden">
     <div id="stagingList" class="tabpanel"></div>
     <div class="workspace-actions">
       <button class="btn btn-primary" id="sendBtn" disabled>Send</button>
@@ -368,7 +371,7 @@ body.dragging{outline:3px dashed var(--blue);outline-offset:-3px}
 </div>
 
 <script>
-const VERSION = 'v1.47';
+const VERSION = 'v1.48';
 document.getElementById('versionTag').textContent = 'version ' + VERSION.replace(/^v/, '');
 
 const themeToggle = document.getElementById('themeToggle');
@@ -1547,9 +1550,9 @@ document.addEventListener('drop', async e => {
     // A stalled directory read (a permission hiccup, a callback that never
     // fires) would otherwise just hang forever with no feedback - it'd look
     // exactly like "nothing happened" rather than a visible error.
-    const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error('timed out reading the dropped item(s) - try again, or use Choose files/Choose folder instead')), 20000));
+    const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error('timed out reading the dropped item(s) - try again, or use Choose files instead')), 20000));
     const files = await Promise.race([filesFromDrop(e.dataTransfer), timeout]);
-    if (!files.length) { alert("Couldn't read anything from that drop - try again, or use Choose files/Choose folder."); return; }
+    if (!files.length) { alert("Couldn't read anything from that drop - try again, or use Choose files."); return; }
     addToQueue(files);
   } catch (err) {
     alert('Reading the dropped item failed: ' + err.message);
@@ -1560,12 +1563,7 @@ document.getElementById('fileInput').addEventListener('change', e => {
   addToQueue([...e.target.files]);
   e.target.value = '';
 });
-document.getElementById('folderInput').addEventListener('change', e => {
-  addToQueue([...e.target.files]);
-  e.target.value = '';
-});
 document.getElementById('pickFilesBtn').addEventListener('click', () => document.getElementById('fileInput').click());
-document.getElementById('pickFolderBtn').addEventListener('click', () => document.getElementById('folderInput').click());
 
 // auto-join if opened from a QR code / shared link
 const urlCode = new URLSearchParams(location.search).get('code');
