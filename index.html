@@ -143,11 +143,7 @@ input[type=text]::placeholder{color:var(--sub)}
 .drop-title{font-size:13px;color:var(--text)}
 .drop-sub{font-size:11px;color:var(--sub)}
 .pick-row{display:flex;gap:8px;flex:none}
-.pick-btn{flex:1;display:flex;align-items:center;justify-content:center;gap:6px;
-  padding:9px 12px;border-radius:20px;border:1px solid var(--border);
-  background:var(--card);color:var(--text);font-size:12px;font-weight:500;
-  cursor:pointer;font-family:var(--font-sans);transition:.15s}
-.pick-btn:hover{border-color:var(--blue);color:var(--blue)}
+.pick-btn{flex:1}
 .pick-btn svg{flex:none}
 body.dragging{outline:3px dashed var(--blue);outline-offset:-3px}
 /* Natural height, capped - stays compact for a few files (the Send button
@@ -305,14 +301,14 @@ body.dragging{outline:3px dashed var(--blue);outline-offset:-3px}
       <div class="drop-sub">Any file type &middot; No size limit</div>
     </div>
     <div class="pick-row">
-      <button class="pick-btn" id="pickFilesBtn"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>Choose files</button>
-      <button class="pick-btn" id="pickFolderBtn"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>Choose folder</button>
+      <button class="btn btn-secondary pick-btn" id="pickFilesBtn" style="display:flex;align-items:center;justify-content:center;gap:6px"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>Choose files</button>
+      <button class="btn btn-secondary pick-btn" id="pickFolderBtn" style="display:flex;align-items:center;justify-content:center;gap:6px"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>Choose folder</button>
     </div>
     <input type="file" id="fileInput" multiple class="hidden">
     <input type="file" id="folderInput" webkitdirectory class="hidden">
     <div id="stagingList" class="tabpanel"></div>
     <div class="workspace-actions">
-      <button class="btn btn-primary" id="sendBtn" disabled>Send files</button>
+      <button class="btn btn-primary" id="sendBtn" disabled>Send</button>
       <span class="send-total hidden" id="sendTotal"></span>
     </div>
   </main>
@@ -330,7 +326,7 @@ body.dragging{outline:3px dashed var(--blue);outline-offset:-3px}
 </div>
 
 <script>
-const VERSION = 'v1.45';
+const VERSION = 'v1.46';
 document.getElementById('versionTag').textContent = 'version ' + VERSION.replace(/^v/, '');
 
 const themeToggle = document.getElementById('themeToggle');
@@ -1206,7 +1202,7 @@ function updateSendButton() {
     totalEl.classList.remove('hidden');
   } else {
     const single = !broadcastAll && selectedPeer && conns.get(selectedPeer);
-    btn.textContent = single && single.status === 'dnd' ? single.name + ' is Do Not Disturb' : 'Send files';
+    btn.textContent = single && single.status === 'dnd' ? single.name + ' is Do Not Disturb' : 'Send';
     totalEl.classList.add('hidden');
   }
 }
