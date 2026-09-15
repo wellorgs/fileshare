@@ -86,7 +86,8 @@ input[type=text]::placeholder{color:var(--sub)}
 /* ---- app shell: top bar + sidebar / workspace / queue+history ---- */
 .app{display:flex;flex-direction:column;min-height:100vh}
 .topbar{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;
-  background:var(--panel);border-bottom:1px solid var(--border);flex:none;
+  background:var(--panel);flex:none;
+  box-shadow:0 1px 1px rgba(255,255,255,.05),0 3px 8px rgba(0,0,0,.35);
   flex-wrap:wrap;row-gap:8px}
 .topbar-brand{display:flex;align-items:center;gap:8px;min-width:0}
 .brand-logo{height:36px;width:auto;flex:none}
@@ -96,8 +97,8 @@ input[type=text]::placeholder{color:var(--sub)}
 #topbarName{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:140px}
 .panels{display:flex;flex-direction:column;flex:1;min-height:0}
 .sidebar,.rightpanel{padding:16px;display:flex;flex-direction:column;gap:12px}
-.sidebar{background:var(--panel);border-bottom:1px solid var(--border)}
-.rightpanel{background:var(--panel);border-top:1px solid var(--border)}
+.sidebar{background:var(--panel);box-shadow:0 3px 8px rgba(0,0,0,.35)}
+.rightpanel{background:var(--panel);box-shadow:0 -3px 8px rgba(0,0,0,.35)}
 .workspace{padding:16px;display:flex;flex-direction:column;gap:12px;flex:1}
 .section{background:var(--card);border-radius:8px;padding:12px;border:1px solid var(--border)}
 .brand{display:flex;align-items:baseline;gap:8px;margin-bottom:2px}
@@ -214,15 +215,17 @@ body.dragging{outline:3px dashed var(--blue);outline-offset:-3px}
    sits right below it, not pinned to the bottom of the page) and scrolls
    internally instead of pushing everything else off-screen for a huge one. */
 #stagingList{flex:none;max-height:340px;overflow-y:auto;min-height:0}
+#peerList{flex:none;max-height:280px;overflow-y:auto;min-height:0;padding-right:18px}
 .workspace-actions{display:flex;gap:10px;align-items:center;flex-wrap:wrap;flex:none}
 .workspace-actions #sendBtn{flex:none;width:auto}
 
-.tabs{display:flex;gap:4px;background:transparent;border-bottom:1px solid var(--border);padding:0}
+.tabs{display:flex;gap:4px;background:transparent;padding:0 0 1px;
+  box-shadow:0 2px 4px -1px rgba(0,0,0,.35)}
 .tab{flex:1;border:none;background:none;padding:10px 0;border-radius:0;font-size:13px;
   font-weight:500;color:var(--sub);cursor:pointer;font-family:var(--font-sans);
   border-bottom:2px solid transparent;margin-bottom:-1px}
 .tab.active{color:var(--text);border-bottom-color:var(--blue)}
-.tabpanel{flex:1;overflow-y:auto;min-height:0}
+.tabpanel{flex:1;overflow-y:auto;min-height:0;padding-right:18px}
 .tab-badge{display:inline-block;background:var(--blue);color:#fff;font-size:11px;font-weight:600;
   border-radius:8px;padding:1px 5px;margin-left:3px;font-family:var(--font-sans)}
 
@@ -259,9 +262,9 @@ body.dragging{outline:3px dashed var(--blue);outline-offset:-3px}
   body{height:100vh;overflow:hidden}
   .app{height:100vh}
   .panels{flex-direction:row;flex:1;min-height:0}
-  .sidebar{width:320px;flex:none;border-bottom:none;border-right:1px solid var(--border);overflow-y:auto}
-  .workspace{flex:1;min-width:0;overflow-y:auto}
-  .rightpanel{width:340px;flex:none;border-top:none;border-left:1px solid var(--border)}
+  .sidebar{width:320px;flex:none;box-shadow:3px 0 8px rgba(0,0,0,.35);overflow-y:visible}
+  .workspace{flex:1;min-width:0;overflow-y:visible}
+  .rightpanel{width:340px;flex:none;box-shadow:-3px 0 8px rgba(0,0,0,.35)}
 }
 /* Below the breakpoint, panels stack in normal document flow with no fixed
    height, so a flex:1 child (the drop zone) has nothing to grow against and
@@ -419,7 +422,7 @@ body.dragging{outline:3px dashed var(--blue);outline-offset:-3px}
 </div>
 
 <script>
-const VERSION = 'v1.53';
+const VERSION = 'v1.54';
 document.getElementById('versionTag').textContent = 'version ' + VERSION.replace(/^v/, '');
 
 const themeToggle = document.getElementById('themeToggle');
@@ -1644,19 +1647,13 @@ function attachCurvedScrollbar(el, opts) {
     svg.setAttribute('width', cfg.radius * 2);
     svg.setAttribute('height', h);
     svg.setAttribute('viewBox', `0 0 ${cfg.radius * 2} ${h}`);
-    // el's own right padding pushes the wrapper's right edge inward from
-    // el's true border - pull the SVG back out so the bar sits flush
-    // against the same edge on every panel, whether it's padded or not.
-    const padRight = parseFloat(getComputedStyle(el).paddingRight) || 0;
-    svg.style.right = (2 - padRight) + 'px';
     // top hook: short horizontal lead-in, then curve down into the track
     let d = `M${mid - cfg.trail},${padTop} L${mid},${padTop} a${innerRad},${innerRad} 0 0 1 ${innerRad} ${innerRad}`;
     thumb.setAttribute('d', d);
     const cornerLength = Math.ceil(thumb.getTotalLength());
-    // straight run down the right edge, then mirror the hook at the bottom
-    d += ` L${padLeft},${h - (cfg.inset + cfg.stroke * 0.5 + innerRad)}` +
-         ` a${innerRad},${innerRad} 0 0 1 ${-innerRad} ${innerRad}` +
-         ` L${mid - cfg.trail},${h - (cfg.inset + cfg.stroke * 0.5)}`;
+    // straight run down the right edge, flush to the panel's true bottom
+    // edge - no hook at the bottom, it just ends there
+    d += ` L${padLeft},${h}`;
     thumb.setAttribute('d', d);
     track.setAttribute('d', d);
     const trackLen = Math.ceil(track.getTotalLength());
@@ -1665,14 +1662,19 @@ function attachCurvedScrollbar(el, opts) {
     thumb.animate([
       { strokeDashoffset: cfg.thumb - cfg.finish - cfg.offsetEnd },
       { strokeDashoffset: -(cornerLength - 4) },
-      { strokeDashoffset: -(trackLen - cornerLength - cfg.thumb + 4) },
-      { strokeDashoffset: -(trackLen - cfg.finish - cfg.offsetEnd) },
+      { strokeDashoffset: -(trackLen - cfg.thumb + cfg.finish) },
     ], { timeline: new ScrollTimeline({ source: el, axis: 'block' }), fill: 'both', easing: 'linear' });
   }
   new ResizeObserver(sync).observe(el);
+  // renderQueue/renderPeerList/etc redraw these lists via innerHTML - that
+  // wipes the prepended bar out from under us. Put it back the moment it
+  // goes missing instead of touching every render call site.
+  new MutationObserver(() => {
+    if (!el.contains(wrap)) { el.prepend(wrap); sync(); }
+  }).observe(el, { childList: true });
   sync();
 }
-[document.querySelector('.sidebar'), document.querySelector('.workspace'), document.getElementById('stagingList'),
+[document.getElementById('peerList'), document.getElementById('stagingList'),
  document.getElementById('activeList'), document.getElementById('historyList')].forEach(el => attachCurvedScrollbar(el));
 </script>
 </body></html>
