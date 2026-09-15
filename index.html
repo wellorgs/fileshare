@@ -139,7 +139,6 @@ input[type=text]::placeholder{color:var(--sub)}
 #drop.over{border-color:var(--blue);background:rgba(31,111,235,.06)}
 .drop-title{font-size:13px;color:var(--text)}
 .drop-sub{font-size:11px;color:var(--sub)}
-.drop-sub a{color:var(--blue);text-decoration:none;cursor:pointer}
 body.dragging{outline:3px dashed var(--blue);outline-offset:-3px}
 /* Natural height, capped - stays compact for a few files (the Send button
    sits right below it, not pinned to the bottom of the page) and scrolls
@@ -272,8 +271,9 @@ body.dragging{outline:3px dashed var(--blue);outline-offset:-3px}
     </div>
 
     <div class="section" id="watchCard">
-      <h3>Watch folder <span class="tagline" id="watchNote" style="margin:0"></span></h3>
-      <button class="btn btn-secondary" id="watchBtn" style="width:100%">Choose folder to watch</button>
+      <h3>Auto-sync a folder <span class="tagline" id="watchNote" style="margin:0"></span></h3>
+      <label style="margin-bottom:8px">New files added to a folder you pick are sent automatically to whichever device is selected above.</label>
+      <button class="btn btn-secondary" id="watchBtn" style="width:100%">Choose folder to auto-sync</button>
       <div class="devices-count" id="watchStatus"></div>
     </div>
 
@@ -292,8 +292,9 @@ body.dragging{outline:3px dashed var(--blue);outline-offset:-3px}
     <div id="drop" onclick="document.getElementById('fileInput').click()">
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
       <div class="drop-title">Drop files here or click to browse</div>
-      <div class="drop-sub">Any file type &middot; No size limit &middot; <a id="pickFolderLink" onclick="event.stopPropagation(); document.getElementById('folderInput').click()">or choose a folder</a></div>
+      <div class="drop-sub">Any file type &middot; No size limit</div>
     </div>
+    <button class="btn btn-secondary" id="pickFolderBtn" style="width:100%">Or choose a whole folder to send</button>
     <input type="file" id="fileInput" multiple class="hidden">
     <input type="file" id="folderInput" webkitdirectory class="hidden">
     <div id="stagingList" class="tabpanel"></div>
@@ -316,7 +317,7 @@ body.dragging{outline:3px dashed var(--blue);outline-offset:-3px}
 </div>
 
 <script>
-const VERSION = 'v41';
+const VERSION = 'v42';
 document.getElementById('versionTag').textContent = '· ' + VERSION;
 
 const themeToggle = document.getElementById('themeToggle');
@@ -403,7 +404,7 @@ function avatarHTML(entry) {
 
 function renderTopbarMe() {
   document.getElementById('topbarName').textContent = myName();
-  document.getElementById('topbarDot').className = 'dot live';
+  document.getElementById('topbarDot').className = 'dot ' + STATUS_DOT[myStatus];
   document.getElementById('topbarAvatar').innerHTML = avatarHTML({ name: myName(), avatar: myAvatar });
 }
 renderTopbarMe();
@@ -464,6 +465,7 @@ statusPicker.addEventListener('click', (e) => {
   myStatus = btn.dataset.status;
   localStorage.setItem('shareStatus', myStatus);
   renderStatusPicker();
+  renderTopbarMe();
   broadcastHello();
 });
 renderStatusPicker();
@@ -1476,6 +1478,7 @@ document.getElementById('folderInput').addEventListener('change', e => {
   addToQueue([...e.target.files]);
   e.target.value = '';
 });
+document.getElementById('pickFolderBtn').addEventListener('click', () => document.getElementById('folderInput').click());
 
 // auto-join if opened from a QR code / shared link
 const urlCode = new URLSearchParams(location.search).get('code');
