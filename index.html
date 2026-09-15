@@ -40,7 +40,7 @@
   width:100%;align-self:stretch;pointer-events:none;z-index:3}
 .curved-bar svg{position:absolute;top:0;right:2px}
 .curved-bar path{stroke-width:var(--stroke-width,3)}
-.curved-bar__track{stroke:var(--border)}
+.curved-bar__track{stroke:var(--sub);opacity:.35}
 .curved-bar__thumb{stroke:var(--orange)}
 body{
   margin:0; min-height:100vh; background:var(--bg); color:var(--text);
@@ -419,7 +419,7 @@ body.dragging{outline:3px dashed var(--blue);outline-offset:-3px}
 </div>
 
 <script>
-const VERSION = 'v1.52';
+const VERSION = 'v1.53';
 document.getElementById('versionTag').textContent = 'version ' + VERSION.replace(/^v/, '');
 
 const themeToggle = document.getElementById('themeToggle');
@@ -1644,6 +1644,11 @@ function attachCurvedScrollbar(el, opts) {
     svg.setAttribute('width', cfg.radius * 2);
     svg.setAttribute('height', h);
     svg.setAttribute('viewBox', `0 0 ${cfg.radius * 2} ${h}`);
+    // el's own right padding pushes the wrapper's right edge inward from
+    // el's true border - pull the SVG back out so the bar sits flush
+    // against the same edge on every panel, whether it's padded or not.
+    const padRight = parseFloat(getComputedStyle(el).paddingRight) || 0;
+    svg.style.right = (2 - padRight) + 'px';
     // top hook: short horizontal lead-in, then curve down into the track
     let d = `M${mid - cfg.trail},${padTop} L${mid},${padTop} a${innerRad},${innerRad} 0 0 1 ${innerRad} ${innerRad}`;
     thumb.setAttribute('d', d);
