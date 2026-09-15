@@ -58,15 +58,35 @@ input[type=text]{
 }
 input[type=text]:focus{border-color:var(--blue)}
 input[type=text]::placeholder{color:var(--sub)}
+/* ---- liquid-glass buttons (macOS-style), adapted from
+   lucasromerodb/liquid-glass-effect-macos: a blurred+distorted backdrop,
+   a translucent tint, and an inset specular shine, layered as
+   ::before/::after so existing button markup doesn't need to change.
+   Negative z-index keeps both layers behind the button's own text
+   without wrapping it in a span. */
 .btn{
+  position:relative;isolation:isolate;overflow:hidden;background:transparent;
   padding:8px 14px;border:none;border-radius:6px;font-size:13px;font-weight:500;
-  cursor:pointer;transition:opacity .15s;font-family:var(--font-sans);
-  box-shadow:inset 0 1px 1px rgba(255,255,255,.12),inset 0 -1px 2px rgba(0,0,0,.3),0 1px 2px rgba(0,0,0,.25);
+  cursor:pointer;font-family:var(--font-sans);
+  box-shadow:0 6px 6px rgba(0,0,0,.2),0 0 16px rgba(0,0,0,.12);
+  transition:padding .4s cubic-bezier(.175,.885,.32,2.2),
+             border-radius .4s cubic-bezier(.175,.885,.32,2.2),opacity .15s;
 }
+.btn::before{
+  content:"";position:absolute;inset:0;z-index:-2;
+  backdrop-filter:blur(4px);filter:url(#glass-distortion);
+}
+.btn::after{
+  content:"";position:absolute;inset:0;z-index:-1;border-radius:inherit;
+  background:var(--glass-tint,rgba(255,255,255,.12));
+  box-shadow:inset 1px 1px 1px rgba(255,255,255,.4),
+             inset -1px -1px 1px rgba(255,255,255,.12);
+}
+.btn:hover{padding:9px 16px;border-radius:9px}
 .btn:active{opacity:.7}
 .btn:disabled{opacity:.4;cursor:default}
-.btn-primary{background:var(--blue);color:#fff;width:100%}
-.btn-secondary{background:var(--card);color:var(--text);border:1px solid var(--border)}
+.btn-primary{--glass-tint:rgba(31,111,235,.55);color:#fff;width:100%}
+.btn-secondary{--glass-tint:rgba(255,255,255,.08);color:var(--text);border:1px solid var(--border)}
 .row{display:flex;gap:8px}
 .row input{flex:1}
 .row .btn{flex:none;width:auto}
@@ -87,7 +107,6 @@ input[type=text]::placeholder{color:var(--sub)}
 .app{display:flex;flex-direction:column;min-height:100vh}
 .topbar{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;
   background:var(--panel);flex:none;
-  box-shadow:0 1px 1px rgba(255,255,255,.05),0 3px 8px rgba(0,0,0,.35);
   flex-wrap:wrap;row-gap:8px}
 .topbar-brand{display:flex;align-items:center;gap:8px;min-width:0}
 .brand-logo{height:36px;width:auto;flex:none}
@@ -97,8 +116,8 @@ input[type=text]::placeholder{color:var(--sub)}
 #topbarName{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:140px}
 .panels{display:flex;flex-direction:column;flex:1;min-height:0}
 .sidebar,.rightpanel{padding:16px;display:flex;flex-direction:column;gap:12px}
-.sidebar{background:var(--panel);box-shadow:0 3px 8px rgba(0,0,0,.35)}
-.rightpanel{background:var(--panel);box-shadow:0 -3px 8px rgba(0,0,0,.35)}
+.sidebar{background:var(--panel)}
+.rightpanel{background:var(--panel)}
 .workspace{padding:16px;display:flex;flex-direction:column;gap:12px;flex:1}
 .section{background:var(--card);border-radius:8px;padding:12px;border:1px solid var(--border)}
 .brand{display:flex;align-items:baseline;gap:8px;margin-bottom:2px}
@@ -176,13 +195,13 @@ input[type=text]::placeholder{color:var(--sub)}
 .split-btn{position:relative;display:flex;flex:none;width:auto;max-width:100%;
   border-radius:6px;overflow:visible;font-family:var(--font-sans)}
 .split-main{display:flex;align-items:center;justify-content:center;gap:6px;
-  background:var(--blue);color:#fff;border:none;padding:8px 14px;font-size:13px;
-  font-weight:500;cursor:pointer;font-family:var(--font-sans);
+  --glass-tint:rgba(31,111,235,.55);color:#fff;font-size:13px;
   border-radius:6px 0 0 6px;white-space:nowrap}
-.split-arrow{flex:none;width:26px;background:var(--blue);color:#fff;border:none;
-  border-left:1px solid rgba(255,255,255,.3);cursor:pointer;font-size:10px;
+.split-arrow{flex:none;width:26px;padding:8px 6px;--glass-tint:rgba(31,111,235,.55);color:#fff;
+  border-left:1px solid rgba(255,255,255,.3);font-size:10px;
   border-radius:0 6px 6px 0}
-.split-main:hover,.split-arrow:hover{filter:brightness(1.12)}
+.split-main:hover{padding:9px 18px 9px 16px;border-radius:9px 0 0 9px}
+.split-arrow:hover{padding:9px 7px;border-radius:0 9px 9px 0}
 .split-menu{position:absolute;bottom:calc(100% + 6px);left:0;min-width:140px;
   background:var(--card);border:1px solid var(--border);border-radius:6px;
   overflow:hidden;z-index:10;box-shadow:0 6px 16px rgba(0,0,0,.35)}
@@ -219,8 +238,7 @@ body.dragging{outline:3px dashed var(--blue);outline-offset:-3px}
 .workspace-actions{display:flex;gap:10px;align-items:center;flex-wrap:wrap;flex:none}
 .workspace-actions #sendBtn{flex:none;width:auto}
 
-.tabs{display:flex;gap:4px;background:transparent;padding:0 0 1px;
-  box-shadow:0 2px 4px -1px rgba(0,0,0,.35)}
+.tabs{display:flex;gap:4px;background:transparent;padding:0}
 .tab{flex:1;border:none;background:none;padding:10px 0;border-radius:0;font-size:13px;
   font-weight:500;color:var(--sub);cursor:pointer;font-family:var(--font-sans);
   border-bottom:2px solid transparent;margin-bottom:-1px}
@@ -262,9 +280,10 @@ body.dragging{outline:3px dashed var(--blue);outline-offset:-3px}
   body{height:100vh;overflow:hidden}
   .app{height:100vh}
   .panels{flex-direction:row;flex:1;min-height:0}
-  .sidebar{width:320px;flex:none;box-shadow:3px 0 8px rgba(0,0,0,.35);overflow-y:visible}
-  .workspace{flex:1;min-width:0;overflow-y:visible}
-  .rightpanel{width:340px;flex:none;box-shadow:-3px 0 8px rgba(0,0,0,.35)}
+  .sidebar{width:320px;flex:none;overflow-y:visible}
+  .workspace{flex:1;min-width:0;overflow-y:visible;
+    border-left:1px solid var(--border);border-right:1px solid var(--border)}
+  .rightpanel{width:340px;flex:none}
 }
 /* Below the breakpoint, panels stack in normal document flow with no fixed
    height, so a flex:1 child (the drop zone) has nothing to grow against and
@@ -386,8 +405,8 @@ body.dragging{outline:3px dashed var(--blue);outline-offset:-3px}
         <div class="drop-sub">Any file type &middot; No size limit</div>
       </div>
       <div class="split-btn" id="pickSplit">
-        <button class="split-main" id="pickFilesBtn"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>Choose</button>
-        <button class="split-arrow" id="pickArrow" title="More options" aria-haspopup="true">&#9660;</button>
+        <button class="btn split-main" id="pickFilesBtn"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>Choose</button>
+        <button class="btn split-arrow" id="pickArrow" title="More options" aria-haspopup="true">&#9660;</button>
         <div class="split-menu hidden" id="pickMenu">
           <button id="menuSelectFiles" type="button">Select File(s)</button>
           <button id="menuSelectFolder" type="button">Select Folder</button>
@@ -422,7 +441,7 @@ body.dragging{outline:3px dashed var(--blue);outline-offset:-3px}
 </div>
 
 <script>
-const VERSION = 'v1.54';
+const VERSION = 'v1.55';
 document.getElementById('versionTag').textContent = 'version ' + VERSION.replace(/^v/, '');
 
 const themeToggle = document.getElementById('themeToggle');
@@ -1646,6 +1665,12 @@ function attachCurvedScrollbar(el, opts) {
     const padLeft = cfg.radius * 2 - padTop;
     svg.setAttribute('width', cfg.radius * 2);
     svg.setAttribute('height', h);
+    // el's own padding-right (reserved so text has clearance from the bar)
+    // pushes this wrapper's edge inward too - push the bar back out past
+    // that padding so it sits near el's true edge, not in the middle of
+    // the gutter next to the text.
+    const padRight = parseFloat(getComputedStyle(el).paddingRight) || 0;
+    svg.style.right = (2 - padRight) + 'px';
     svg.setAttribute('viewBox', `0 0 ${cfg.radius * 2} ${h}`);
     // top hook: short horizontal lead-in, then curve down into the track
     let d = `M${mid - cfg.trail},${padTop} L${mid},${padTop} a${innerRad},${innerRad} 0 0 1 ${innerRad} ${innerRad}`;
@@ -1677,4 +1702,21 @@ function attachCurvedScrollbar(el, opts) {
 [document.getElementById('peerList'), document.getElementById('stagingList'),
  document.getElementById('activeList'), document.getElementById('historyList')].forEach(el => attachCurvedScrollbar(el));
 </script>
+
+<svg style="position:absolute;width:0;height:0;overflow:hidden" aria-hidden="true">
+  <filter id="glass-distortion" x="0%" y="0%" width="100%" height="100%" filterUnits="objectBoundingBox">
+    <feTurbulence type="fractalNoise" baseFrequency="0.01 0.01" numOctaves="1" seed="5" result="turbulence"/>
+    <feComponentTransfer in="turbulence" result="mapped">
+      <feFuncR type="gamma" amplitude="1" exponent="10" offset="0.5"/>
+      <feFuncG type="gamma" amplitude="0" exponent="1" offset="0"/>
+      <feFuncB type="gamma" amplitude="0" exponent="1" offset="0.5"/>
+    </feComponentTransfer>
+    <feGaussianBlur in="turbulence" stdDeviation="3" result="softMap"/>
+    <feSpecularLighting in="softMap" surfaceScale="5" specularConstant="1" specularExponent="100" lighting-color="white" result="specLight">
+      <fePointLight x="-200" y="-200" z="300"/>
+    </feSpecularLighting>
+    <feComposite in="specLight" operator="arithmetic" k1="0" k2="1" k3="1" k4="0" result="litImage"/>
+    <feDisplacementMap in="SourceGraphic" in2="softMap" scale="8" xChannelSelector="R" yChannelSelector="G"/>
+  </filter>
+</svg>
 </body></html>
