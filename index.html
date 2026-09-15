@@ -139,6 +139,7 @@ input[type=text]::placeholder{color:var(--sub)}
 #drop.over{border-color:var(--blue);background:rgba(31,111,235,.06)}
 .drop-title{font-size:13px;color:var(--text)}
 .drop-sub{font-size:11px;color:var(--sub)}
+.drop-sub a{color:var(--blue);text-decoration:none;cursor:pointer}
 body.dragging{outline:3px dashed var(--blue);outline-offset:-3px}
 /* Natural height, capped - stays compact for a few files (the Send button
    sits right below it, not pinned to the bottom of the page) and scrolls
@@ -291,9 +292,10 @@ body.dragging{outline:3px dashed var(--blue);outline-offset:-3px}
     <div id="drop" onclick="document.getElementById('fileInput').click()">
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
       <div class="drop-title">Drop files here or click to browse</div>
-      <div class="drop-sub">Any file type &middot; No size limit</div>
+      <div class="drop-sub">Any file type &middot; No size limit &middot; <a id="pickFolderLink" onclick="event.stopPropagation(); document.getElementById('folderInput').click()">or choose a folder</a></div>
     </div>
     <input type="file" id="fileInput" multiple class="hidden">
+    <input type="file" id="folderInput" webkitdirectory class="hidden">
     <div id="stagingList" class="tabpanel"></div>
     <div class="workspace-actions">
       <button class="btn btn-primary" id="sendBtn" disabled>Send files</button>
@@ -314,7 +316,7 @@ body.dragging{outline:3px dashed var(--blue);outline-offset:-3px}
 </div>
 
 <script>
-const VERSION = 'v40';
+const VERSION = 'v41';
 document.getElementById('versionTag').textContent = '· ' + VERSION;
 
 const themeToggle = document.getElementById('themeToggle');
@@ -671,6 +673,90 @@ function joinRoom(codeOverride) {
   });
 }
 
+// ---- large-file streaming (opportunistic upgrade over the in-memory path
+// above) ----
+//
+// Buffering a whole file in RAM (both prepareForSend's arrayBuffer() and
+// this app's receive-side chunks array) is fine up to ~1-2GB, then risks
+// crashing the tab - that ceiling doesn't move without buffering less.
+// Above LARGE_THRESHOLD, and only in a browser with the File System Access
+// API, the sender reads and hashes the file in small blocks instead of all
+// at once, and the receiver writes each verified block straight to disk
+// instead of holding it in an array. Below the threshold, or in a browser
+// without that API (Firefox/Safari), everything behaves exactly as before
+// - this is additive, not a replacement.
+//
+// ponytail: large-file resume restarts that one file from byte 0 instead
+// of the small-file path's exact-offset resume - correctly resuming a
+// partially-written disk file needs seeking a FileSystemWritableFileStream
+// to a resume point, which is real extra complexity for a case (a multi-GB
+// transfer dying AND reconnecting mid-file) uncommon enough to not be
+// worth it yet. Upgrade path if it ever is: track bytes written to the
+// writable and reopen it with `keepExistingData: true` at that offset.
+const LARGE_THRESHOLD = 2 * 1024 * 1024 * 1024; // 2GB
+const BLOCK = 4 * 1024 * 1024; // 4MB - per-block hash + disk write granularity
+const supportsFileSystemAccess = !!window.showSaveFilePicker;
+
+function addIncomingLargeFilePrompt(name, size, fromName, onAccept) {
+  const list = document.getElementById('activeList');
+  if (list.querySelector('.empty')) list.innerHTML = '';
+  const row = document.createElement('div');
+  row.className = 'filerow';
+  row.innerHTML =
+    `<span class="file-icon">${ICON.file}</span>` +
+    `<div class="meta"><div class="name">${name}</div>` +
+    `<div class="from">${fmtSize(size)} incoming from ${fromName} - large file, choose where to save</div></div>` +
+    `<button class="btn btn-primary" style="padding:6px 10px;font-size:10px;flex:none">Accept</button>`;
+  const btn = row.querySelector('button');
+  btn.onclick = async () => {
+    btn.disabled = true; btn.textContent = 'Choose location...';
+    try {
+      await onAccept();
+      row.remove();
+      showActiveEmptyIfNeeded();
+    } catch (err) {
+      btn.disabled = false; btn.textContent = 'Accept';
+      if (err.name !== 'AbortError') alert("Couldn't start saving: " + err.message);
+    }
+  };
+  list.prepend(row);
+  updateTabBadges();
+}
+
+function handleLargeFileStart(conn, entry, msg) {
+  const dc = conn.dataChannel;
+  addIncomingLargeFilePrompt(msg.name, msg.size, entry.name, async () => {
+    const handle = await window.showSaveFilePicker({ suggestedName: msg.name.split('/').pop() });
+    const writable = await handle.createWritable();
+    const key = entry.name + '|' + msg.name;
+    const pending = { large: true, writable, blockOk: true, block: null, blockChunks: [], blockReceived: 0 };
+    pendingReceive.set(key, pending);
+    conn._incoming = {
+      name: msg.name,
+      large: true,
+      write: async (chunk) => {
+        pending.blockChunks.push(chunk);
+        pending.blockReceived += chunk.byteLength;
+        if (pending.block && pending.blockReceived >= pending.block.size) {
+          const blockBuf = await new Blob(pending.blockChunks).arrayBuffer();
+          if ((await sha256Hex(blockBuf)) !== pending.block.hash) pending.blockOk = false;
+          await pending.writable.write(blockBuf);
+          pending.blockChunks = [];
+          pending.blockReceived = 0;
+          pending.block = null;
+        }
+      },
+      finish: async () => {
+        await pending.writable.close();
+        pendingReceive.delete(key);
+        addReceivedRow(msg.name, msg.size, entry.name, null, pending.blockOk);
+        return pending.blockOk;
+      }
+    };
+    dc.send(JSON.stringify({ type: 'file-ack', name: msg.name, offset: 0 }));
+  });
+}
+
 // PeerJS's default "binary" serialization silently corrupts ArrayBuffers
 // sent through conn.send() (data arrives truncated to 0 bytes) - a library
 // bug, reproduced directly against unpkg's build. PeerJS is used only to
@@ -709,6 +795,15 @@ function addConn(conn) {
           } else if (msg.type === 'file-start') {
             entry.busy = true;
             renderPeerList();
+            // Above LARGE_THRESHOLD, and only where the File System Access
+            // API exists to stream straight to disk, skip the in-memory
+            // path entirely - this doesn't ack immediately, it waits for
+            // the user to click Accept (a real save-location picker needs
+            // a real user gesture) before telling the sender to start.
+            if (msg.large && supportsFileSystemAccess) {
+              handleLargeFileStart(conn, entry, msg);
+              return;
+            }
             // pendingReceive is keyed by device NAME (not this conn's peerId,
             // which changes every reconnect) so a partial receive survives a
             // dropped connection - matching sha256 means "same logical file,
@@ -722,6 +817,9 @@ function addConn(conn) {
             if (!pendingRows.has(key)) addPendingRow(msg.name, entry.name);
             conn._incoming = startIncoming(msg.name, msg.size, entry.name, msg.sha256, pending);
             dc.send(JSON.stringify({ type: 'file-ack', name: msg.name, offset: pending.receivedBytes }));
+          } else if (msg.type === 'block-start' && conn._incoming && conn._incoming.large) {
+            const pending = pendingReceive.get(entry.name + '|' + conn._incoming.name);
+            if (pending) pending.block = { size: msg.size, hash: msg.sha256 };
           } else if (msg.type === 'file-end' && conn._incoming) {
             const name = conn._incoming.name;
             const verified = await conn._incoming.finish();
@@ -1140,9 +1238,15 @@ function waitForAck(peerId, path, timeoutMs) {
 
 async function prepareForSend(file) {
   const path = file.webkitRelativePath || file.name;
+  if (file.size >= LARGE_THRESHOLD) {
+    // No whole-file read/hash here - see sendPreparedFileLarge, which reads
+    // and hashes it in BLOCK-sized pieces instead so the sender's memory
+    // use stays flat regardless of file size.
+    return { path, file, large: true, size: file.size };
+  }
   const buf = await file.arrayBuffer();
   const hash = await sha256Hex(buf);
-  return { path, buf, hash };
+  return { path, buf, hash, size: buf.byteLength };
 }
 
 // Every send starts with a file-start/file-ack round trip, even for a
@@ -1150,7 +1254,7 @@ async function prepareForSend(file) {
 // RTT is nothing next to transferring the bytes, and it means resuming a
 // dropped transfer is the exact same code path as starting one, not a
 // special case bolted on top.
-async function sendPreparedFile(conn, prepared, toName) {
+async function sendPreparedFileSmall(conn, prepared, toName) {
   const dc = conn.dataChannel;
   const { path, buf, hash } = prepared;
   markSending(conn.peer, path);
@@ -1188,6 +1292,58 @@ async function sendPreparedFile(conn, prepared, toName) {
   pendingResume.delete(toName + '|' + path);
 }
 
+// Reads and hashes the file in BLOCK-sized pieces via File.slice() instead
+// of prepareForSend's whole-file arrayBuffer() - peak sender memory is one
+// block (4MB), not the whole file, regardless of whether it's 2GB or
+// 20GB. `waitForAck` here can take a while: the receiver doesn't answer
+// until a human clicks Accept and picks a save location.
+async function sendPreparedFileLarge(conn, prepared, toName) {
+  const dc = conn.dataChannel;
+  const { path, file, size } = prepared;
+  markSending(conn.peer, path);
+  try {
+    dc.send(JSON.stringify({ type: 'file-start', name: path, size, large: true }));
+    await waitForAck(conn.peer, path, 120000);
+  } catch (err) {
+    pendingResume.set(toName + '|' + path, prepared);
+    throw new Error(toName + " didn't accept the file in time - will retry automatically once reconnected");
+  }
+  const startTime = performance.now();
+  let sent = 0;
+  try {
+    for (let off = 0; off < size; off += BLOCK) {
+      const blockBuf = await file.slice(off, Math.min(off + BLOCK, size)).arrayBuffer();
+      const blockHash = await sha256Hex(blockBuf);
+      if (dc.readyState !== 'open') throw new Error('connection dropped');
+      dc.send(JSON.stringify({ type: 'block-start', size: blockBuf.byteLength, sha256: blockHash }));
+      for (let boff = 0; boff < blockBuf.byteLength; boff += CHUNK) {
+        if (dc.readyState !== 'open') throw new Error('connection dropped');
+        const slice = blockBuf.slice(boff, boff + CHUNK);
+        while (dc.bufferedAmount > 8 * 1024 * 1024) {
+          if (dc.readyState !== 'open') throw new Error('connection dropped');
+          await new Promise(r => setTimeout(r, 20));
+        }
+        dc.send(slice);
+        sent += slice.byteLength;
+        const elapsed = (performance.now() - startTime) / 1000;
+        const speed = elapsed > 0 ? sent / elapsed : 0;
+        const eta = speed > 0 ? (size - sent) / speed : 0;
+        markProgress(conn.peer, path, size ? sent / size : 1, speed, eta);
+      }
+    }
+  } catch (err) {
+    pendingResume.set(toName + '|' + path, prepared);
+    throw new Error('connection to ' + toName + ' dropped - will restart this file once reconnected');
+  }
+  dc.send(JSON.stringify({ type: 'file-end' }));
+  markSent(conn.peer, path);
+  pendingResume.delete(toName + '|' + path);
+}
+
+function sendPreparedFile(conn, prepared, toName) {
+  return prepared.large ? sendPreparedFileLarge(conn, prepared, toName) : sendPreparedFileSmall(conn, prepared, toName);
+}
+
 // Called whenever a device's hello arrives (fresh connect or reconnect) -
 // if it's still owed a file from before, pick up where the receiver says
 // it left off, with no user action needed.
@@ -1195,7 +1351,7 @@ function resumePendingSendsTo(entry, conn) {
   for (const [key, prepared] of [...pendingResume]) {
     if (!key.startsWith(entry.name + '|')) continue;
     pendingResume.delete(key);
-    addSentRow(conn.peer, prepared.path, prepared.buf.byteLength, entry.name, null);
+    addSentRow(conn.peer, prepared.path, prepared.size, entry.name, null);
     sendPreparedFile(conn, prepared, entry.name).catch(err => markFailed(conn.peer, prepared.path, err.message));
   }
 }
@@ -1300,7 +1456,11 @@ document.addEventListener('drop', async e => {
   drop.classList.remove('over');
   document.body.classList.remove('dragging');
   try {
-    const files = await filesFromDrop(e.dataTransfer);
+    // A stalled directory read (a permission hiccup, a callback that never
+    // fires) would otherwise just hang forever with no feedback - it'd look
+    // exactly like "nothing happened" rather than a visible error.
+    const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error('timed out reading the dropped item(s) - try again, or click the drop zone to browse instead')), 20000));
+    const files = await Promise.race([filesFromDrop(e.dataTransfer), timeout]);
     if (!files.length) { alert("Couldn't read anything from that drop - try again, or click the drop zone to browse."); return; }
     addToQueue(files);
   } catch (err) {
@@ -1309,6 +1469,10 @@ document.addEventListener('drop', async e => {
 });
 
 document.getElementById('fileInput').addEventListener('change', e => {
+  addToQueue([...e.target.files]);
+  e.target.value = '';
+});
+document.getElementById('folderInput').addEventListener('change', e => {
   addToQueue([...e.target.files]);
   e.target.value = '';
 });
