@@ -19,7 +19,7 @@ Works across different WiFi networks, mobile data, or entirely different locatio
 - **Works on any network** — same WiFi/LAN goes direct; different networks fall back through a TURN relay automatically, no VPN or port forwarding needed.
 - **Room code + QR join** — no accounts, no pairing dance.
 - **Multi-device rooms** — a host sees every joined device; click one to target it, or hit **All** to broadcast a send to every connected device at once.
-- **Folders** — drop a folder and it's zipped automatically before sending, unzip on the other end.
+- **Folders** — drag a folder in, or pick one from the file picker's dropdown; the whole structure sends natively and lands back in the same folder layout, no zip step either side.
 - **Checksum-verified transfers** — every file is SHA-256 hashed on send and rechecked on receipt, with a visible verified/mismatch badge, so silent corruption doesn't slip through.
 - **Resumable transfers** — if a connection drops mid-file, it picks back up from the exact byte the receiver actually has as soon as the device reconnects, no restart from zero.
 - **Live speed + ETA** on every in-flight transfer.

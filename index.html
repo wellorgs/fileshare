@@ -3,7 +3,6 @@
 <title>FileShare</title>
 <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@400;500;600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
@@ -21,22 +20,22 @@
 *{box-sizing:border-box}
 body{
   margin:0; min-height:100vh; background:var(--bg); color:var(--text);
-  font-family:var(--font-sans); font-size:14px;
+  font-family:var(--font-sans); font-size:16px;
   -webkit-font-smoothing:antialiased;
 }
-h1{font-size:13px;font-weight:600;margin:0;font-family:var(--font-sans);letter-spacing:-.26px}
-.tagline{color:var(--sub);font-size:10px;margin:2px 0 0;font-family:var(--font-sans)}
-h3{margin:0 0 10px;font-size:10px;font-weight:500;color:var(--sub);
+h1{font-size:15px;font-weight:600;margin:0;font-family:var(--font-sans);letter-spacing:-.26px}
+.tagline{color:var(--sub);font-size:12px;margin:2px 0 0;font-family:var(--font-sans)}
+h3{margin:0 0 10px;font-size:12px;font-weight:500;color:var(--sub);
   text-transform:uppercase;letter-spacing:1px;font-family:var(--font-sans)}
-label{font-size:11px;color:var(--sub);display:block;margin-bottom:6px}
+label{font-size:13px;color:var(--sub);display:block;margin-bottom:6px}
 input[type=text]{
   width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:6px;
-  font-size:11px;background:transparent;color:var(--text);outline:none;font-family:var(--font-sans);
+  font-size:13px;background:transparent;color:var(--text);outline:none;font-family:var(--font-sans);
 }
 input[type=text]:focus{border-color:var(--blue)}
 input[type=text]::placeholder{color:var(--sub)}
 .btn{
-  padding:8px 14px;border:none;border-radius:6px;font-size:11.5px;font-weight:500;
+  padding:8px 14px;border:none;border-radius:6px;font-size:13px;font-weight:500;
   cursor:pointer;transition:opacity .15s;font-family:var(--font-sans);
 }
 .btn:active{opacity:.7}
@@ -46,11 +45,11 @@ input[type=text]::placeholder{color:var(--sub)}
 .row{display:flex;gap:8px}
 .row input{flex:1}
 .row .btn{flex:none;width:auto}
-.code{font-size:26px;font-weight:700;letter-spacing:4px;text-align:center;
+.code{font-size:30px;font-weight:700;letter-spacing:4px;text-align:center;
   padding:2px 0 8px;color:var(--blue);font-family:var(--font-mono)}
 #qrbox{display:flex;justify-content:center;padding:6px 0 2px}
 #qrbox img,#qrbox canvas{border-radius:8px;width:110px;height:110px}
-.status{display:flex;align-items:center;gap:7px;font-size:11px;color:var(--sub);font-family:var(--font-sans)}
+.status{display:flex;align-items:center;gap:7px;font-size:13px;color:var(--sub);font-family:var(--font-sans)}
 .dot{width:6px;height:6px;border-radius:50%;background:var(--sub);flex:none}
 .dot.live{background:var(--green)}
 .dot.pending{background:var(--orange)}
@@ -68,7 +67,7 @@ input[type=text]::placeholder{color:var(--sub)}
 .brand-logo{height:36px;width:auto;flex:none}
 .topbar .tagline{margin:0;align-self:flex-end;padding-bottom:2px;white-space:nowrap}
 .topbar-me{display:flex;align-items:center;gap:7px;font-family:var(--font-sans);
-  font-size:11px;color:var(--sub);flex:none;margin-left:auto}
+  font-size:13px;color:var(--sub);flex:none;margin-left:auto}
 #topbarName{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:140px}
 .panels{display:flex;flex-direction:column;flex:1;min-height:0}
 .sidebar,.rightpanel{padding:16px;display:flex;flex-direction:column;gap:12px}
@@ -81,18 +80,18 @@ input[type=text]::placeholder{color:var(--sub)}
   border:1px solid var(--border);cursor:pointer;object-fit:cover}
 .status-picker{display:flex;gap:6px;margin-top:8px}
 .status-pill{flex:1;padding:6px 4px;border-radius:6px;border:1px solid var(--border);
-  background:transparent;color:var(--sub);font-size:10px;cursor:pointer;font-family:var(--font-sans)}
+  background:transparent;color:var(--sub);font-size:12px;cursor:pointer;font-family:var(--font-sans)}
 .status-pill.active{border-color:var(--blue);color:var(--text);background:rgba(31,111,235,.12)}
-.target-header .avatar{width:30px;height:30px;font-size:13px}
+.target-header .avatar{width:30px;height:30px;font-size:15px}
 
 .devices-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
 .devices-head h3{margin:0}
-.icon-btn{border:none;background:none;color:var(--sub);cursor:pointer;font-size:13px;
+.icon-btn{border:none;background:none;color:var(--sub);cursor:pointer;font-size:15px;
   padding:2px 4px;line-height:1;border-radius:6px}
 .icon-btn:hover{background:var(--panel);color:var(--text)}
 .icon-btn:active{opacity:.6}
 .icon-btn.active{background:var(--blue);color:#fff}
-.device-row{display:flex;align-items:center;gap:9px;padding:9px 10px;font-size:13px;
+.device-row{display:flex;align-items:center;gap:9px;padding:9px 10px;font-size:15px;
   border-radius:6px;cursor:pointer;border-left:2px solid transparent}
 .device-row:hover{background:rgba(255,255,255,.03)}
 .device-row.selected{background:rgba(31,111,235,.12);border-left-color:var(--blue)}
@@ -101,10 +100,10 @@ input[type=text]::placeholder{color:var(--sub)}
 .device-row .dot{flex:none}
 .device-row .device-meta{flex:1;overflow:hidden}
 .device-row .device-name{font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
-  font-size:11px;font-family:var(--font-sans);color:var(--text)}
-.device-row .device-sub{font-size:10px;color:var(--sub);display:flex;align-items:center;gap:5px;
+  font-size:13px;font-family:var(--font-sans);color:var(--text)}
+.device-row .device-sub{font-size:12px;color:var(--sub);display:flex;align-items:center;gap:5px;
   font-family:var(--font-sans);margin-top:2px}
-.device-row .chevron{flex:none;font-size:13px;opacity:.7}
+.device-row .chevron{flex:none;font-size:15px;opacity:.7}
 .identify-btn{flex:none;border:none;background:none;color:var(--sub);cursor:pointer;
   padding:4px;line-height:1;border-radius:5px;display:flex}
 .identify-btn:hover{background:var(--panel);color:var(--orange)}
@@ -112,42 +111,59 @@ input[type=text]::placeholder{color:var(--sub)}
   z-index:9999;animation:identifyPulse .5s ease-in-out 4}
 @keyframes identifyPulse{0%,100%{opacity:0}50%{opacity:.35}}
 .avatar{width:24px;height:24px;border-radius:50%;background:var(--blue);color:#fff;
-  font-size:11px;font-weight:600;display:flex;align-items:center;justify-content:center;flex:none;object-fit:cover}
-.os-badge{font-size:9px;font-weight:500;color:var(--sub);background:var(--panel);
+  font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center;flex:none;object-fit:cover}
+.os-badge{font-size:11px;font-weight:500;color:var(--sub);background:var(--panel);
   border-radius:4px;padding:1px 4px;flex:none;font-family:var(--font-sans)}
-.devices-count{font-size:10px;color:var(--sub);text-align:center;padding-top:4px;font-family:var(--font-sans)}
-.footer-credit{margin-top:auto;padding-top:16px;font-size:11px;color:var(--sub);text-align:center}
+.devices-count{font-size:12px;color:var(--sub);text-align:center;padding-top:4px;font-family:var(--font-sans)}
+.footer-credit{margin-top:auto;padding-top:16px;font-size:13px;color:var(--sub);text-align:center}
 .target-header{display:flex;align-items:center;gap:10px}
 .target-header .meta{flex:1;overflow:hidden}
-.target-header .name{font-size:14px;font-weight:600;font-family:var(--font-sans)}
-.target-header .sub{font-size:11px;color:var(--sub);font-family:var(--font-sans);margin-top:2px}
+.target-header .name{font-size:16px;font-weight:600;font-family:var(--font-sans)}
+.target-header .sub{font-size:13px;color:var(--sub);font-family:var(--font-sans);margin-top:2px}
 .busy-pill{margin-left:auto;flex:none;background:rgba(255,166,87,.12);color:var(--orange);
-  font-size:10px;font-weight:500;font-family:var(--font-sans);padding:4px 8px;border-radius:5px;
+  font-size:12px;font-weight:500;font-family:var(--font-sans);padding:4px 8px;border-radius:5px;
   border:1px solid rgba(255,166,87,.3)}
 
 .queue-head{display:flex;align-items:center;justify-content:space-between;
-  font-size:10px;color:var(--sub);text-transform:uppercase;letter-spacing:1px;
+  font-size:12px;color:var(--sub);text-transform:uppercase;letter-spacing:1px;
   font-family:var(--font-sans);padding-bottom:8px;margin-bottom:2px;border-bottom:1px solid var(--border)}
-.queue-head a{color:var(--blue);text-decoration:none;text-transform:none;letter-spacing:normal;font-size:11px;cursor:pointer}
+.queue-head a{color:var(--blue);text-decoration:none;text-transform:none;letter-spacing:normal;font-size:13px;cursor:pointer}
 .file-icon{width:20px;height:20px;flex:none;color:var(--sub);display:flex;align-items:center;justify-content:center}
-.send-total{font-size:11px;color:var(--sub);font-family:var(--font-sans);white-space:nowrap}
+.send-total{font-size:13px;color:var(--sub);font-family:var(--font-sans);white-space:nowrap}
 
 /* Fixed, compact box - never balloons to fill the page even when nothing
    is queued. The staged-files list below it (not this box) is what grows
    to fill the remaining space, matching the reference design. */
 #drop{
   border:2px dashed var(--border);border-radius:8px;padding:14px 16px;text-align:center;
-  color:var(--sub);transition:.15s;flex:none;height:130px;display:flex;cursor:pointer;
-  flex-direction:column;align-items:center;justify-content:center;gap:5px;
+  color:var(--sub);transition:.15s;flex:none;height:180px;display:flex;
+  flex-direction:column;align-items:center;justify-content:space-between;
   font-family:var(--font-sans)
 }
-#drop:hover{border-color:var(--sub)}
 #drop.over{border-color:var(--blue);background:rgba(31,111,235,.06)}
-.drop-title{font-size:13px;color:var(--text)}
-.drop-sub{font-size:11px;color:var(--sub)}
-.pick-row{display:flex;gap:8px;flex:none}
-.pick-btn{flex:1;width:auto}
-.pick-btn svg{flex:none}
+.drop-copy{display:flex;flex-direction:column;align-items:center;gap:5px;margin:auto 0}
+.drop-title{font-size:16px;color:var(--text)}
+.drop-sub{font-size:14px;color:var(--sub)}
+
+/* ---- split file/folder picker: primary action + dropdown for the other ---- */
+.split-btn{position:relative;display:flex;flex:none;width:200px;max-width:100%;
+  border-radius:6px;overflow:visible;font-family:var(--font-sans)}
+.split-main{flex:1;display:flex;align-items:center;justify-content:center;gap:6px;
+  background:var(--blue);color:#fff;border:none;padding:9px 10px;font-size:14px;
+  font-weight:500;cursor:pointer;font-family:var(--font-sans);
+  border-radius:6px 0 0 6px}
+.split-arrow{flex:none;width:30px;background:var(--blue);color:#fff;border:none;
+  border-left:1px solid rgba(255,255,255,.3);cursor:pointer;font-size:11px;
+  border-radius:0 6px 6px 0}
+.split-main:hover,.split-arrow:hover{filter:brightness(1.12)}
+.split-menu{position:absolute;bottom:calc(100% + 6px);left:0;right:0;
+  background:var(--card);border:1px solid var(--border);border-radius:6px;
+  overflow:hidden;z-index:10;box-shadow:0 6px 16px rgba(0,0,0,.35)}
+.split-menu button{display:block;width:100%;text-align:left;padding:9px 12px;
+  background:none;border:none;color:var(--text);font-size:14px;cursor:pointer;
+  font-family:var(--font-sans)}
+.split-menu button:hover{background:var(--panel)}
+.split-menu button+button{border-top:1px solid var(--border)}
 
 .theme-switch-input{width:0;height:0;position:absolute;visibility:hidden}
 .theme-switch{
@@ -176,12 +192,12 @@ body.dragging{outline:3px dashed var(--blue);outline-offset:-3px}
 .workspace-actions #sendBtn{flex:none;width:auto}
 
 .tabs{display:flex;gap:4px;background:transparent;border-bottom:1px solid var(--border);padding:0}
-.tab{flex:1;border:none;background:none;padding:10px 0;border-radius:0;font-size:11px;
+.tab{flex:1;border:none;background:none;padding:10px 0;border-radius:0;font-size:13px;
   font-weight:500;color:var(--sub);cursor:pointer;font-family:var(--font-sans);
   border-bottom:2px solid transparent;margin-bottom:-1px}
 .tab.active{color:var(--text);border-bottom-color:var(--blue)}
 .tabpanel{flex:1;overflow-y:auto;min-height:0}
-.tab-badge{display:inline-block;background:var(--blue);color:#fff;font-size:9px;font-weight:600;
+.tab-badge{display:inline-block;background:var(--blue);color:#fff;font-size:11px;font-weight:600;
   border-radius:8px;padding:1px 5px;margin-left:3px;font-family:var(--font-sans)}
 
 .filerow .progress{height:3px;background:var(--border);border-radius:2px;margin-top:6px;overflow:hidden}
@@ -197,16 +213,16 @@ body.dragging{outline:3px dashed var(--blue);outline-offset:-3px}
 .filerow .progress{flex-basis:100%}
 .filerow:last-child{border-bottom:none}
 .filerow .meta{flex:1;overflow:hidden}
-.filerow .name{font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-family:var(--font-sans)}
+.filerow .name{font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-family:var(--font-sans)}
 .filerow .name a{color:var(--text);text-decoration:none}
-.filerow .from{font-size:11px;color:var(--sub)}
-.filerow .size{font-size:11px;color:var(--sub);flex:none;font-family:var(--font-sans)}
+.filerow .from{font-size:13px;color:var(--sub)}
+.filerow .size{font-size:13px;color:var(--sub);flex:none;font-family:var(--font-sans)}
 .filerow .right{display:flex;flex-direction:column;align-items:flex-end;flex:none;gap:2px}
-.filerow .time{font-size:10px;color:var(--sub);font-family:var(--font-sans)}
-.filerow button{flex:none;border:none;background:none;color:var(--red);font-size:12px;cursor:pointer;padding:4px 6px}
-.filerow button.resend-btn{color:var(--blue);font-size:14px}
-.empty{color:var(--sub);font-size:12px;text-align:center;padding:16px 0}
-.badge{width:20px;height:20px;border-radius:50%;flex:none;color:#fff;font-size:11px;
+.filerow .time{font-size:12px;color:var(--sub);font-family:var(--font-sans)}
+.filerow button{flex:none;border:none;background:none;color:var(--red);font-size:14px;cursor:pointer;padding:4px 6px}
+.filerow button.resend-btn{color:var(--blue);font-size:16px}
+.empty{color:var(--sub);font-size:14px;text-align:center;padding:16px 0}
+.badge{width:20px;height:20px;border-radius:50%;flex:none;color:#fff;font-size:13px;
   display:flex;align-items:center;justify-content:center;font-weight:700}
 .badge.in{background:var(--green)}
 .badge.out{background:var(--blue)}
@@ -218,7 +234,7 @@ body.dragging{outline:3px dashed var(--blue);outline-offset:-3px}
   .app{height:100vh}
   .panels{flex-direction:row;flex:1;min-height:0}
   .sidebar{width:280px;flex:none;border-bottom:none;border-right:1px solid var(--border);overflow-y:auto}
-  .workspace{flex:1;min-width:0;overflow-y:auto}
+  .workspace{flex:1;min-width:0;overflow-y:auto;max-width:640px;margin:0 auto}
   .rightpanel{width:300px;flex:none;border-top:none;border-left:1px solid var(--border)}
 }
 /* Below the breakpoint, panels stack in normal document flow with no fixed
@@ -337,14 +353,22 @@ body.dragging{outline:3px dashed var(--blue);outline-offset:-3px}
       <span class="busy-pill hidden" id="targetBusyPill">busy &mdash; may be slower</span>
     </div>
     <div id="drop">
-      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-      <div class="drop-title">Drag files or a folder here</div>
-      <div class="drop-sub">Any file type &middot; No size limit</div>
-    </div>
-    <div class="pick-row">
-      <button class="btn btn-primary pick-btn" id="pickFilesBtn" style="display:flex;align-items:center;justify-content:center;gap:6px"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>Choose files</button>
+      <div class="drop-copy">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        <div class="drop-title">Drag files or folders here</div>
+        <div class="drop-sub">Any file type &middot; No size limit</div>
+      </div>
+      <div class="split-btn" id="pickSplit">
+        <button class="split-main" id="pickFilesBtn"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>Choose Files</button>
+        <button class="split-arrow" id="pickArrow" title="More options" aria-haspopup="true">&#9660;</button>
+        <div class="split-menu hidden" id="pickMenu">
+          <button id="menuSelectFiles" type="button">Select File(s)</button>
+          <button id="menuSelectFolder" type="button">Select Folder</button>
+        </div>
+      </div>
     </div>
     <input type="file" id="fileInput" multiple class="hidden">
+    <input type="file" id="folderInput" webkitdirectory class="hidden">
     <div id="stagingList" class="tabpanel"></div>
     <div class="workspace-actions">
       <button class="btn btn-primary" id="sendBtn" disabled>Send</button>
@@ -371,7 +395,7 @@ body.dragging{outline:3px dashed var(--blue);outline-offset:-3px}
 </div>
 
 <script>
-const VERSION = 'v1.48';
+const VERSION = 'v1.49';
 document.getElementById('versionTag').textContent = 'version ' + VERSION.replace(/^v/, '');
 
 const themeToggle = document.getElementById('themeToggle');
@@ -775,7 +799,7 @@ function addIncomingLargeFilePrompt(name, size, fromName, onAccept) {
     `<span class="file-icon">${ICON.file}</span>` +
     `<div class="meta"><div class="name">${name}</div>` +
     `<div class="from">${fmtSize(size)} incoming from ${fromName} - large file, choose where to save</div></div>` +
-    `<button class="btn btn-primary" style="padding:6px 10px;font-size:10px;flex:none">Accept</button>`;
+    `<button class="btn btn-primary" style="padding:6px 10px;font-size:12px;flex:none">Accept</button>`;
   const btn = row.querySelector('button');
   btn.onclick = async () => {
     btn.disabled = true; btn.textContent = 'Choose location...';
@@ -1223,7 +1247,7 @@ function renderQueue() {
     row.className = 'filerow';
     row.innerHTML =
       `<span class="file-icon">${ICON.file}</span>` +
-      `<div class="meta"><div class="name">${file.name}</div>` +
+      `<div class="meta"><div class="name">${file.webkitRelativePath || file.name}</div>` +
       `<div class="from">${fmtSize(file.size)} &middot; ${file.type || 'application/octet-stream'}</div></div>`;
     const remove = document.createElement('button');
     remove.textContent = 'Remove';
@@ -1252,50 +1276,16 @@ function updateSendButton() {
   }
 }
 
-// ---- preparing dropped/picked items: folders get zipped into one file ----
+// ---- queuing dropped/picked items ----
 //
-// A browser can only ever trigger individual file downloads - there's no
-// way for a webpage to write an actual folder to the receiver's disk in
-// one action. Sending a folder's files individually means the receiver
-// gets N separate downloads instead of "the folder". Zipping the folder
-// into one file before sending is the only way to deliver it as a single
-// download; the receiver extracts it locally to get the folder back.
-async function zipFolder(folderName, files) {
-  const zip = new JSZip();
-  for (const f of files) {
-    zip.file(f.webkitRelativePath.slice(folderName.length + 1), f);
-  }
-  const blob = await zip.generateAsync({ type: 'blob' });
-  return new File([blob], folderName + '.zip');
-}
-
-async function prepareFiles(fileList) {
-  const loose = [];
-  const folders = new Map(); // top-level folder name -> its files
-  for (const f of fileList) {
-    const rel = f.webkitRelativePath;
-    if (rel && rel.includes('/')) {
-      const top = rel.split('/')[0];
-      if (!folders.has(top)) folders.set(top, []);
-      folders.get(top).push(f);
-    } else {
-      loose.push(f);
-    }
-  }
-  const prepared = [...loose];
-  for (const [folderName, files] of folders) {
-    try {
-      prepared.push(await zipFolder(folderName, files));
-    } catch (err) {
-      alert("Couldn't zip " + folderName + ': ' + err.message);
-    }
-  }
-  return prepared;
-}
-
-async function addToQueue(fileList) {
-  const prepared = await prepareFiles(fileList);
-  queue.push(...prepared);
+// Folder files carry their relative path in .webkitRelativePath (set
+// natively by a webkitdirectory input, or manually in readEntry() below for
+// drag-and-drop). prepareForSend() already uses that path as the
+// transferred name, and a "/" in it makes Chrome recreate the subfolder
+// under Downloads on save - so a folder's files go straight into the queue
+// as-is, no zipping needed to keep the structure intact.
+function addToQueue(fileList) {
+  queue.push(...fileList);
   renderQueue();
 }
 
@@ -1563,7 +1553,28 @@ document.getElementById('fileInput').addEventListener('change', e => {
   addToQueue([...e.target.files]);
   e.target.value = '';
 });
+document.getElementById('folderInput').addEventListener('change', e => {
+  addToQueue([...e.target.files]);
+  e.target.value = '';
+});
 document.getElementById('pickFilesBtn').addEventListener('click', () => document.getElementById('fileInput').click());
+
+const pickMenu = document.getElementById('pickMenu');
+document.getElementById('pickArrow').addEventListener('click', e => {
+  e.stopPropagation();
+  pickMenu.classList.toggle('hidden');
+});
+document.getElementById('menuSelectFiles').addEventListener('click', () => {
+  pickMenu.classList.add('hidden');
+  document.getElementById('fileInput').click();
+});
+document.getElementById('menuSelectFolder').addEventListener('click', () => {
+  pickMenu.classList.add('hidden');
+  document.getElementById('folderInput').click();
+});
+document.addEventListener('click', e => {
+  if (!pickMenu.classList.contains('hidden') && !e.target.closest('.split-btn')) pickMenu.classList.add('hidden');
+});
 
 // auto-join if opened from a QR code / shared link
 const urlCode = new URLSearchParams(location.search).get('code');
