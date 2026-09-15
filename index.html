@@ -44,6 +44,7 @@ input[type=text]::placeholder{color:var(--sub)}
 .btn{
   padding:8px 14px;border:none;border-radius:6px;font-size:13px;font-weight:500;
   cursor:pointer;transition:opacity .15s;font-family:var(--font-sans);
+  box-shadow:inset 0 1px 1px rgba(255,255,255,.12),inset 0 -1px 2px rgba(0,0,0,.3),0 1px 2px rgba(0,0,0,.25);
 }
 .btn:active{opacity:.7}
 .btn:disabled{opacity:.4;cursor:default}
@@ -175,7 +176,7 @@ input[type=text]::placeholder{color:var(--sub)}
 
 .theme-switch-input{width:0;height:0;position:absolute;visibility:hidden}
 .theme-switch{
-  width:60px;height:30px;position:relative;display:block;flex:none;cursor:pointer;
+  width:60px;height:30px;margin:0;position:relative;display:block;flex:none;cursor:pointer;
   background:#ebebeb;border-radius:30px;transition:.3s;
   box-shadow:inset 0 2px 4px rgba(0,0,0,.25),inset 0 -2px 4px rgba(255,255,255,.4);
 }
@@ -187,7 +188,7 @@ input[type=text]::placeholder{color:var(--sub)}
 .theme-switch svg{position:absolute;top:8px;width:14px;height:14px;z-index:1;transition:.3s}
 .theme-switch svg.sun{left:8px;fill:#fff}
 .theme-switch svg.moon{left:38px;fill:#7e7e7e}
-.theme-switch-input:checked + .theme-switch{background:#242424}
+.theme-switch-input:checked + .theme-switch{background:#0d1117}
 .theme-switch-input:checked + .theme-switch:after{left:32px;background:linear-gradient(180deg,#777,#3a3a3a)}
 .theme-switch-input:checked + .theme-switch svg.sun{fill:#7e7e7e}
 .theme-switch-input:checked + .theme-switch svg.moon{fill:#fff}
@@ -242,7 +243,7 @@ body.dragging{outline:3px dashed var(--blue);outline-offset:-3px}
   .app{height:100vh}
   .panels{flex-direction:row;flex:1;min-height:0}
   .sidebar{width:320px;flex:none;border-bottom:none;border-right:1px solid var(--border);overflow-y:auto}
-  .workspace{flex:1;min-width:0;overflow-y:auto;max-width:640px;margin:0 auto}
+  .workspace{flex:1;min-width:0;overflow-y:auto}
   .rightpanel{width:340px;flex:none;border-top:none;border-left:1px solid var(--border)}
 }
 /* Below the breakpoint, panels stack in normal document flow with no fixed
@@ -309,6 +310,10 @@ body.dragging{outline:3px dashed var(--blue);outline-offset:-3px}
         <button class="status-pill" data-status="busy">Busy</button>
         <button class="status-pill" data-status="dnd">Do Not Disturb</button>
       </div>
+    </div>
+
+    <div class="section">
+      <div class="status"><span class="dot" id="dot"></span><span id="status">not connected</span></div>
     </div>
 
     <div class="section" id="createStep">
@@ -397,7 +402,7 @@ body.dragging{outline:3px dashed var(--blue);outline-offset:-3px}
 </div>
 
 <script>
-const VERSION = 'v1.50';
+const VERSION = 'v1.51';
 document.getElementById('versionTag').textContent = 'version ' + VERSION.replace(/^v/, '');
 
 const themeToggle = document.getElementById('themeToggle');
