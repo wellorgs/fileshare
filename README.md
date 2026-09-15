@@ -1,41 +1,48 @@
-# fileshare-local
+# FileShare — free peer-to-peer file transfer, no app, no upload, no size limit
 
-Two ways to send files directly between two computers, no cloud storage involved.
+**[wellorgs.github.io/fileshare](https://wellorgs.github.io/fileshare/)** — an AirDrop / Nearby Share alternative that works in any browser, on any OS, on the same WiFi or across the internet. Open the page on two devices, connect with a 6-digit code or QR, drag a file over. Nothing is ever uploaded anywhere — files go straight device-to-device over WebRTC, end-to-end encrypted.
 
-## Option A — hosted page, works over WiFi or the internet
+Useful for: sending files between Windows, Mac, Linux, iPhone, iPad, and Android without installing anything; sending large files (video, ISOs, zipped folders) without a cloud upload/download round trip or a file-size cap; transferring files between a phone and a laptop on different networks; a quick, private, no-signup alternative to email attachments, USB drives, or cloud storage links.
 
-Open **https://wellorgs.github.io/fileshare-local/** on both devices.
+## Quick start
 
-1. On device 1, click **Create room** — it shows a 6-digit code.
-2. On device 2, type that code under **Option B: Join with a code**, click **Connect**.
-3. Once status says "connected" on both, drag a file onto either page to send it to the other — it downloads straight there.
+1. Open **https://wellorgs.github.io/fileshare/** on both devices — nothing to install.
+2. On device A, click **Create room** — you get a 6-digit code and a QR code.
+3. On device B, either scan the QR or type the code under **Join a room**, click **Connect**.
+4. Drag files onto the drop zone (or click it to browse), pick who to send to, hit **Send**.
 
-This uses WebRTC: once connected, files go directly browser-to-browser (peer-to-peer). The 6-digit code is just a room name on a free public signaling broker used to set up that connection; GitHub never sees your files, and neither does the broker. Works on any network, including different WiFi networks, as long as neither side is behind strict corporate NAT (in which case use Option B).
+Works across different WiFi networks, mobile data, or entirely different locations — it tries a direct connection first and automatically falls back through a relay if the two devices can't reach each other directly. The only case it can't get around is a network that blocks WebRTC outright (some locked-down corporate firewalls).
 
-## Option B — local script, same WiFi only, zero setup friction
+## Features
 
-On **both** machines (needs Python 3):
+- **Direct P2P transfer, end-to-end encrypted** — WebRTC data channels, DTLS-encrypted by default. No file ever touches a server; the room code is only used to set up the connection.
+- **Works on any network** — same WiFi/LAN goes direct; different networks fall back through a TURN relay automatically, no VPN or port forwarding needed.
+- **Room code + QR join** — no accounts, no pairing dance.
+- **Multi-device rooms** — a host sees every joined device; click one to target it, or hit **All** to broadcast a send to every connected device at once.
+- **Folders** — drop a folder and it's zipped automatically before sending, unzip on the other end.
+- **Checksum-verified transfers** — every file is SHA-256 hashed on send and rechecked on receipt, with a visible verified/mismatch badge, so silent corruption doesn't slip through.
+- **Resumable transfers** — if a connection drops mid-file, it picks back up from the exact byte the receiver actually has as soon as the device reconnects, no restart from zero.
+- **Live speed + ETA** on every in-flight transfer.
+- **Re-send** a past file from History in one click, no re-picking it from disk.
+- **Watch folder auto-sync** (Chrome/Edge) — point it at a folder (e.g. a camera-roll/downloads dump) and new files sync automatically to your selected device(s).
+- **Device avatars, names, and status** (Available/Busy/Do Not Disturb), synced live across connected devices.
+- **Flash to identify** — can't tell which physical device is "Swift Falcon"? One click makes its screen flash.
+- **Light/dark theme**, no page reload.
+
+## Alternative: local network script (`lanshare.py`)
+
+A zero-dependency Python fallback for large multi-GB transfers on the same WiFi, streaming to disk in chunks instead of buffering in the browser:
 
 ```bash
 python lanshare.py
 ```
 
-It prints something like:
+See the script's own printed instructions for the rest — open the printed URL on both machines and drag files onto the other device's page.
 
-```
-LAN Share running. On the OTHER machine, open: http://192.168.1.42:8000
-```
+## Privacy
 
-1. Open `http://<your-own-ip>:8000` in your browser (the URL printed above, or shown at the top of the page).
-2. Tell the other person your IP, or type theirs into the "other device's IP" box and click **Open their page** — it opens their page in a new tab.
-3. Drag a file onto the drop zone on **their** page to send it to them. Works the other way too — whoever's page you're dragging onto is who receives the file.
-4. Received files show up under **Received files** on that machine (clickable to download), and are saved to a `received/` folder next to the script.
+No accounts, no analytics, no server-side storage. The only third party involved is a public WebRTC signaling broker (to match the room code to a connection) and, when a direct connection isn't possible, a public TURN relay (which only ever sees already-encrypted traffic, the same as any VPN or corporate proxy). Closing the tab ends the session; nothing persists anywhere but your own browser's local storage (your device name, avatar, and theme preference).
 
-Works for large files (multi-GB) — both upload and download stream in 1MB chunks, so memory use stays flat regardless of file size.
+---
 
-## Notes
-
-- Both machines must be on the same network and able to reach each other (same WiFi; some public/guest WiFi networks block device-to-device traffic).
-- No authentication — anyone on your network who has the URL can upload/download. Fine for a home/office LAN, not for open networks.
-- Default port is 8000. Change it with `python lanshare.py 9000`.
-- If Windows Firewall prompts on first run, allow access on private networks.
+**Keywords:** file sharing, airdrop for windows, airdrop alternative, nearby share alternative, peer to peer file transfer, p2p file sharing, webrtc file transfer, send files between devices, cross platform file sharing, no upload file transfer, no cloud file sharing, private file transfer, secure file transfer, LAN file sharing, local network file sharing, large file transfer, send large files free, quick share alternative, share files between phone and pc, wireless file transfer, browser based file sharing, no size limit file transfer, direct device to device transfer, offline file transfer, cross network file transfer.
