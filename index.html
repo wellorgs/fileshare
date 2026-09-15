@@ -56,10 +56,10 @@ input[type=text]::placeholder{color:var(--sub)}
 
 /* ---- app shell: top bar + sidebar / workspace / queue+history ---- */
 .app{display:flex;flex-direction:column;min-height:100vh}
-.topbar{display:flex;align-items:center;justify-content:space-between;padding:10px 16px;
+.topbar{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;
   background:var(--panel);border-bottom:1px solid var(--border);flex:none}
 .topbar-brand{display:flex;align-items:center;gap:8px}
-.brand-logo{height:26px;width:auto;flex:none}
+.brand-logo{height:36px;width:auto;flex:none}
 .topbar .tagline{margin:0}
 .topbar-me{display:flex;align-items:center;gap:7px;font-family:var(--font-sans);font-size:11px;color:var(--sub)}
 .panels{display:flex;flex-direction:column;flex:1;min-height:0}
@@ -278,7 +278,7 @@ body.dragging{outline:3px dashed var(--blue);outline-offset:-3px}
 </div>
 
 <script>
-const VERSION = 'v35';
+const VERSION = 'v36';
 document.getElementById('versionTag').textContent = '· ' + VERSION;
 
 // A stuck old Service Worker from an earlier version of this page could
