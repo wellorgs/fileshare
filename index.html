@@ -14,6 +14,10 @@
   --font-mono:"Geist Mono",ui-monospace,"SF Mono",monospace;
   --font-sans:Inter,-apple-system,BlinkMacSystemFont,sans-serif;
 }
+:root[data-theme="light"]{
+  --bg:#ffffff; --panel:#f6f8fa; --card:#ffffff; --text:#1f2328; --sub:#59636e;
+  --blue:#0969da; --red:#cf222e; --green:#1a7f37; --orange:#9a6700; --border:#d0d7de;
+}
 *{box-sizing:border-box}
 body{
   margin:0; min-height:100vh; background:var(--bg); color:var(--text);
@@ -69,9 +73,13 @@ input[type=text]::placeholder{color:var(--sub)}
 .workspace{padding:16px;display:flex;flex-direction:column;gap:12px;flex:1}
 .section{background:var(--card);border-radius:8px;padding:12px;border:1px solid var(--border)}
 .brand{display:flex;align-items:baseline;gap:8px;margin-bottom:2px}
-.device-icon{width:26px;height:26px;border-radius:6px;background:var(--panel);border:1px solid var(--border);
-  flex:none;display:flex;align-items:center;justify-content:center;color:var(--sub)}
-.target-header .device-icon{width:30px;height:30px}
+.avatar-preview{width:32px;height:32px;border-radius:50%;flex:none;background:var(--card);
+  border:1px solid var(--border);cursor:pointer;object-fit:cover}
+.status-picker{display:flex;gap:6px;margin-top:8px}
+.status-pill{flex:1;padding:6px 4px;border-radius:6px;border:1px solid var(--border);
+  background:transparent;color:var(--sub);font-size:10px;cursor:pointer;font-family:var(--font-sans)}
+.status-pill.active{border-color:var(--blue);color:var(--text);background:rgba(31,111,235,.12)}
+.target-header .avatar{width:30px;height:30px;font-size:13px}
 
 .devices-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
 .devices-head h3{margin:0}
@@ -79,6 +87,7 @@ input[type=text]::placeholder{color:var(--sub)}
   padding:2px 4px;line-height:1;border-radius:6px}
 .icon-btn:hover{background:var(--panel);color:var(--text)}
 .icon-btn:active{opacity:.6}
+.icon-btn.active{background:var(--blue);color:#fff}
 .device-row{display:flex;align-items:center;gap:9px;padding:9px 10px;font-size:13px;
   border-radius:6px;cursor:pointer;border-left:2px solid transparent}
 .device-row:hover{background:rgba(255,255,255,.03)}
@@ -91,7 +100,7 @@ input[type=text]::placeholder{color:var(--sub)}
   font-family:var(--font-sans);margin-top:2px}
 .device-row .chevron{flex:none;font-size:13px;opacity:.7}
 .avatar{width:24px;height:24px;border-radius:50%;background:var(--blue);color:#fff;
-  font-size:11px;font-weight:600;display:flex;align-items:center;justify-content:center;flex:none}
+  font-size:11px;font-weight:600;display:flex;align-items:center;justify-content:center;flex:none;object-fit:cover}
 .os-badge{font-size:9px;font-weight:500;color:var(--sub);background:var(--panel);
   border-radius:4px;padding:1px 4px;flex:none;font-family:var(--font-sans)}
 .devices-count{font-size:10px;color:var(--sub);text-align:center;padding-top:4px;font-family:var(--font-sans)}
@@ -161,6 +170,7 @@ body.dragging{outline:3px dashed var(--blue);outline-offset:-3px}
 .filerow .right{display:flex;flex-direction:column;align-items:flex-end;flex:none;gap:2px}
 .filerow .time{font-size:10px;color:var(--sub);font-family:var(--font-sans)}
 .filerow button{flex:none;border:none;background:none;color:var(--red);font-size:12px;cursor:pointer;padding:4px 6px}
+.filerow button.resend-btn{color:var(--blue);font-size:14px}
 .empty{color:var(--sub);font-size:12px;text-align:center;padding:16px 0}
 .badge{width:20px;height:20px;border-radius:50%;flex:none;color:#fff;font-size:11px;
   display:flex;align-items:center;justify-content:center;font-weight:700}
@@ -194,6 +204,8 @@ body.dragging{outline:3px dashed var(--blue);outline-offset:-3px}
       <span class="tagline" id="versionTag"></span>
     </div>
     <div class="topbar-me">
+      <button class="icon-btn" id="themeToggle" title="Toggle light/dark theme">&#9728;</button>
+      <span id="topbarAvatar"></span>
       <span class="dot" id="topbarDot"></span><span id="topbarName"></span>
     </div>
   </header>
@@ -205,7 +217,16 @@ body.dragging{outline:3px dashed var(--blue);outline-offset:-3px}
 
     <div class="section">
       <h3>Your name</h3>
-      <input type="text" id="myName" placeholder="e.g. Akhil's laptop" maxlength="30">
+      <div class="row" style="align-items:center;margin-bottom:8px">
+        <img class="avatar-preview" id="avatarPreview" onclick="document.getElementById('avatarInput').click()" title="Click to set an avatar">
+        <input type="text" id="myName" placeholder="e.g. Akhil's laptop" maxlength="30">
+      </div>
+      <input type="file" id="avatarInput" accept="image/*" class="hidden">
+      <div class="status-picker" id="statusPicker">
+        <button class="status-pill" data-status="available">Available</button>
+        <button class="status-pill" data-status="busy">Busy</button>
+        <button class="status-pill" data-status="dnd">Do Not Disturb</button>
+      </div>
     </div>
 
     <div class="section">
@@ -233,7 +254,10 @@ body.dragging{outline:3px dashed var(--blue);outline-offset:-3px}
     <div class="section" id="devicesCard">
       <div class="devices-head">
         <h3>Devices</h3>
-        <button class="icon-btn" id="refreshDevices" title="Refresh">&#8635;</button>
+        <div style="display:flex;gap:4px">
+          <button class="icon-btn" id="selectAllBtn" title="Send to all connected devices">All</button>
+          <button class="icon-btn" id="refreshDevices" title="Refresh">&#8635;</button>
+        </div>
       </div>
       <input type="text" id="deviceFilter" placeholder="Filter devices..." style="margin-bottom:8px">
       <div id="peerList"><div class="empty">none connected yet</div></div>
@@ -245,7 +269,7 @@ body.dragging{outline:3px dashed var(--blue);outline-offset:-3px}
 
   <main class="workspace">
     <div id="targetHeader" class="section target-header hidden">
-      <span class="device-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg></span>
+      <span id="targetAvatar"></span>
       <div class="meta">
         <div class="name" id="targetName"></div>
         <div class="sub" id="targetSub"></div>
@@ -278,8 +302,20 @@ body.dragging{outline:3px dashed var(--blue);outline-offset:-3px}
 </div>
 
 <script>
-const VERSION = 'v36';
+const VERSION = 'v37';
 document.getElementById('versionTag').textContent = '· ' + VERSION;
+
+const themeToggle = document.getElementById('themeToggle');
+function applyTheme(theme) {
+  document.documentElement.setAttribute('data-theme', theme);
+  themeToggle.innerHTML = theme === 'light' ? '&#9789;' : '&#9728;';
+}
+applyTheme(localStorage.getItem('theme') || 'dark');
+themeToggle.addEventListener('click', () => {
+  const next = document.documentElement.getAttribute('data-theme') === 'light' ? 'dark' : 'light';
+  localStorage.setItem('theme', next);
+  applyTheme(next);
+});
 
 // A stuck old Service Worker from an earlier version of this page could
 // still be intercepting requests and breaking things. That whole approach
@@ -300,7 +336,6 @@ function detectOS() {
 const MY_OS = detectOS();
 
 const ICON = {
-  monitor: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>',
   file: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>',
   spinner: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>',
   clock: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>',
@@ -309,70 +344,177 @@ const ICON = {
 };
 
 let peer;
-const conns = new Map(); // conn.peer -> { conn, name, os, busy }
+const conns = new Map(); // conn.peer -> { conn, name, os, avatar, myStatus, busy }
 let selectedPeer = null; // peerId of the device files will be sent to
 const statusEl = document.getElementById('status');
 const dotEl = document.getElementById('dot');
 const nameInput = document.getElementById('myName');
 nameInput.value = localStorage.getItem('shareName') || '';
-nameInput.addEventListener('input', () => { localStorage.setItem('shareName', nameInput.value); renderTopbarMe(); });
+nameInput.addEventListener('input', () => { localStorage.setItem('shareName', nameInput.value); renderTopbarMe(); broadcastHello(); });
 
 function myName() { return nameInput.value.trim() || 'a device'; }
 function setStatus(s, dotClass) {
   statusEl.textContent = s;
   dotEl.className = 'dot' + (dotClass ? ' ' + dotClass : '');
 }
+
+// ---- avatar + availability status: local prefs, broadcast to peers over
+// the same dataChannel hello message already used for name/os ----
+
+const STATUS_LABELS = { available: 'Available', busy: 'Busy', dnd: 'Do Not Disturb' };
+const STATUS_DOT = { available: 'live', busy: 'busy', dnd: 'err' };
+let myAvatar = localStorage.getItem('shareAvatar') || null;
+let myStatus = localStorage.getItem('shareStatus') || 'available';
+
+function initials(name) { return ((name || '?').trim()[0] || '?').toUpperCase(); }
+function avatarHTML(entry) {
+  return entry.avatar
+    ? `<img class="avatar" src="${entry.avatar}">`
+    : `<div class="avatar">${initials(entry.name)}</div>`;
+}
+
 function renderTopbarMe() {
   document.getElementById('topbarName').textContent = myName();
   document.getElementById('topbarDot').className = 'dot live';
+  document.getElementById('topbarAvatar').innerHTML = avatarHTML({ name: myName(), avatar: myAvatar });
 }
 renderTopbarMe();
 
-// A device row is click-to-select: exactly one connected device is the
-// active send target at a time (matches the reference design), rather than
-// broadcasting to everyone connected.
+const avatarPreview = document.getElementById('avatarPreview');
+function renderAvatarPreview() {
+  avatarPreview.src = myAvatar || 'data:image/svg+xml,' + encodeURIComponent(
+    `<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32"><rect width="32" height="32" fill="#1f6feb"/><text x="16" y="21" font-size="14" fill="#fff" text-anchor="middle" font-family="sans-serif">${initials(myName())}</text></svg>`);
+}
+renderAvatarPreview();
+nameInput.addEventListener('input', renderAvatarPreview);
+
+// Downscale/compress to a small square JPEG before storing or sending -
+// an uncompressed phone photo would bloat every hello message and
+// localStorage; 64x64 is plenty for a UI avatar.
+function resizeImageToDataURL(file, size) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = size; canvas.height = size;
+      const ctx = canvas.getContext('2d');
+      const scale = Math.max(size / img.width, size / img.height);
+      const w = img.width * scale, h = img.height * scale;
+      ctx.drawImage(img, (size - w) / 2, (size - h) / 2, w, h);
+      URL.revokeObjectURL(img.src);
+      resolve(canvas.toDataURL('image/jpeg', 0.7));
+    };
+    img.onerror = () => { URL.revokeObjectURL(img.src); reject(new Error('could not read image')); };
+    img.src = URL.createObjectURL(file);
+  });
+}
+
+document.getElementById('avatarInput').addEventListener('change', async (e) => {
+  const file = e.target.files[0];
+  e.target.value = '';
+  if (!file) return;
+  try {
+    myAvatar = await resizeImageToDataURL(file, 64);
+    localStorage.setItem('shareAvatar', myAvatar);
+    renderAvatarPreview();
+    renderTopbarMe();
+    broadcastHello();
+  } catch (err) {
+    alert("Couldn't use that image: " + err.message);
+  }
+});
+
+const statusPicker = document.getElementById('statusPicker');
+function renderStatusPicker() {
+  statusPicker.querySelectorAll('.status-pill').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.status === myStatus);
+  });
+}
+statusPicker.addEventListener('click', (e) => {
+  const btn = e.target.closest('.status-pill');
+  if (!btn) return;
+  myStatus = btn.dataset.status;
+  localStorage.setItem('shareStatus', myStatus);
+  renderStatusPicker();
+  broadcastHello();
+});
+renderStatusPicker();
+
+function helloPayload() {
+  return { type: 'hello', name: myName(), os: MY_OS, avatar: myAvatar, status: myStatus };
+}
+function broadcastHello() {
+  for (const { conn } of conns.values()) {
+    if (conn.open) conn.dataChannel.send(JSON.stringify(helloPayload()));
+  }
+}
+
+// A device row is click-to-select: normally exactly one connected device is
+// the active send target (matches the reference design). "Select all"
+// switches to broadcast mode - every connected device becomes the target,
+// over each device's own dataChannel (still one file-in-flight per
+// connection at a time, just fanned out across connections in parallel).
+let broadcastAll = false;
+function sendTargets() {
+  if (broadcastAll) return [...conns.values()].filter(t => t.conn.open);
+  const t = selectedPeer && conns.get(selectedPeer);
+  return t && t.conn.open ? [t] : [];
+}
+
 function renderPeerList() {
   const box = document.getElementById('peerList');
   const countEl = document.getElementById('devicesCount');
   if (selectedPeer && !conns.has(selectedPeer)) selectedPeer = null;
   if (!selectedPeer && conns.size) selectedPeer = [...conns.keys()][0];
   countEl.textContent = conns.size ? conns.size + ' connected' : '';
+  document.getElementById('selectAllBtn').classList.toggle('active', broadcastAll);
   if (!conns.size) { box.innerHTML = '<div class="empty">none connected yet</div>'; renderTargetHeader(); return; }
   const filter = document.getElementById('deviceFilter').value.trim().toLowerCase();
   const matches = [...conns.entries()].filter(([, { name }]) => name.toLowerCase().includes(filter));
   if (!matches.length) { box.innerHTML = '<div class="empty">no devices match</div>'; renderTargetHeader(); updateSendButton(); return; }
   box.innerHTML = '';
-  for (const [peerId, { name, os, busy }] of matches) {
-    const selected = peerId === selectedPeer;
+  for (const [peerId, entry] of matches) {
+    const { name, os, busy, status } = entry;
+    const selected = broadcastAll || peerId === selectedPeer;
+    const dotClass = busy ? 'busy' : STATUS_DOT[status || 'available'];
+    const subLabel = busy ? 'transferring' : STATUS_LABELS[status || 'available'];
     const row = document.createElement('div');
     row.className = 'device-row' + (selected ? ' selected' : '');
     row.innerHTML =
-      `<span class="device-icon">${ICON.monitor}</span>` +
+      avatarHTML(entry) +
       `<div class="device-meta"><div class="device-name">${name}</div>` +
-      `<div class="device-sub"><span class="os-badge">${os || '?'}</span>${busy ? 'busy' : 'connected'}</div></div>` +
-      `<span class="dot ${busy ? 'busy' : 'live'}"></span>` +
+      `<div class="device-sub"><span class="os-badge">${os || '?'}</span>${subLabel}</div></div>` +
+      `<span class="dot ${dotClass}"></span>` +
       (selected ? '<span class="chevron">&#8250;</span>' : '');
-    row.onclick = () => { selectedPeer = peerId; renderPeerList(); };
+    row.onclick = () => { broadcastAll = false; selectedPeer = peerId; renderPeerList(); };
     box.appendChild(row);
   }
   renderTargetHeader();
   updateSendButton();
 }
 document.getElementById('deviceFilter').addEventListener('input', renderPeerList);
-document.getElementById('refreshDevices').addEventListener('click', () => {
-  for (const { conn, name } of conns.values()) {
-    if (conn.open) conn.dataChannel.send(JSON.stringify({ type: 'hello', name: myName(), os: MY_OS }));
-  }
-  renderPeerList();
-});
+document.getElementById('refreshDevices').addEventListener('click', () => { broadcastHello(); renderPeerList(); });
+document.getElementById('selectAllBtn').addEventListener('click', () => { broadcastAll = !broadcastAll; renderPeerList(); });
 
 function renderTargetHeader() {
   const header = document.getElementById('targetHeader');
+  const avatarEl = document.getElementById('targetAvatar');
+  if (broadcastAll) {
+    const targets = sendTargets();
+    if (!targets.length) { header.classList.add('hidden'); return; }
+    header.classList.remove('hidden');
+    avatarEl.innerHTML = avatarHTML({ name: 'All' });
+    document.getElementById('targetName').textContent = 'All connected devices';
+    document.getElementById('targetSub').textContent = targets.length + ' device' + (targets.length > 1 ? 's' : '');
+    document.getElementById('targetBusyPill').classList.toggle('hidden', !targets.some(t => t.busy));
+    return;
+  }
   const entry = selectedPeer && conns.get(selectedPeer);
   if (!entry) { header.classList.add('hidden'); return; }
   header.classList.remove('hidden');
+  avatarEl.innerHTML = avatarHTML(entry);
   document.getElementById('targetName').textContent = entry.name;
-  document.getElementById('targetSub').textContent = (entry.os || '?') + ' · ' + (entry.busy ? 'busy' : 'connected');
+  document.getElementById('targetSub').textContent = (entry.os || '?') + ' · ' + (entry.busy ? 'transferring' : STATUS_LABELS[entry.status || 'available']);
   document.getElementById('targetBusyPill').classList.toggle('hidden', !entry.busy);
 }
 
@@ -426,7 +568,7 @@ function joinRoom(codeOverride) {
   setStatus('connecting to room ' + code + '...', 'pending');
   peer = new Peer({ config: ICE_CONFIG });
   peer.on('open', () => {
-    addConn(peer.connect(code, { reliable: true, metadata: { name: myName(), os: MY_OS } }));
+    addConn(peer.connect(code, { reliable: true, metadata: { name: myName(), os: MY_OS, avatar: myAvatar, status: myStatus } }));
     document.getElementById('createStep').classList.add('hidden');
     document.getElementById('joinStep').classList.add('hidden');
   });
@@ -444,12 +586,13 @@ function joinRoom(codeOverride) {
 // traffic goes straight over the underlying RTCDataChannel, bypassing
 // PeerJS's serializer entirely.
 function addConn(conn) {
-  const entry = { conn, name: (conn.metadata && conn.metadata.name) || 'a device', os: (conn.metadata && conn.metadata.os) || null };
+  const meta = conn.metadata || {};
+  const entry = { conn, name: meta.name || 'a device', os: meta.os || null, avatar: meta.avatar || null, status: meta.status || 'available' };
   conns.set(conn.peer, entry);
   conn.on('open', () => {
     const dc = conn.dataChannel;
     dc.binaryType = 'arraybuffer';
-    dc.send(JSON.stringify({ type: 'hello', name: myName(), os: MY_OS }));
+    dc.send(JSON.stringify(helloPayload()));
     setStatus(conns.size + ' device' + (conns.size > 1 ? 's' : '') + ' connected', 'live');
     renderPeerList();
 
@@ -467,20 +610,23 @@ function addConn(conn) {
           if (msg.type === 'hello') {
             entry.name = msg.name;
             entry.os = msg.os;
+            entry.avatar = msg.avatar || null;
+            entry.status = msg.status || 'available';
             renderPeerList();
           } else if (msg.type === 'file-start') {
             entry.busy = true;
             renderPeerList();
             addPendingRow(msg.name, entry.name);
-            conn._incoming = startIncoming(msg.name, msg.size, entry.name);
+            conn._incoming = startIncoming(msg.name, msg.size, entry.name, msg.sha256);
           } else if (msg.type === 'file-end' && conn._incoming) {
-            await conn._incoming.finish();
-            dc.send(JSON.stringify({ type: 'delivered', name: conn._incoming.name }));
+            const name = conn._incoming.name;
+            const verified = await conn._incoming.finish();
+            dc.send(JSON.stringify({ type: 'delivered', name, verified }));
             conn._incoming = null;
             entry.busy = false;
             renderPeerList();
           } else if (msg.type === 'delivered') {
-            markDelivered(conn.peer, msg.name);
+            markDelivered(conn.peer, msg.name, msg.verified);
           }
         } else if (conn._incoming) {
           await conn._incoming.write(e.data);
@@ -508,13 +654,25 @@ function addConn(conn) {
 // ponytail: whole file held in memory - fine up to ~1-2GB depending on
 // the device; for reliably handling bigger files, self-host something
 // like polius/FileSync instead.
-function startIncoming(name, size, fromName) {
+//
+// SHA-256 (native SubtleCrypto, no library) over the sender's original
+// bytes, sent alongside file-start and rechecked here against the
+// reassembled data - catches transfer corruption, including the kind of
+// silent data-loss bug already found once in this app's dependencies.
+async function sha256Hex(buffer) {
+  const digest = await crypto.subtle.digest('SHA-256', buffer);
+  return [...new Uint8Array(digest)].map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+function startIncoming(name, size, fromName, expectedHash) {
   const chunks = [];
   return {
     name,
     write: (chunk) => { chunks.push(chunk); },
     finish: async () => {
-      const url = URL.createObjectURL(new Blob(chunks));
+      const blob = new Blob(chunks);
+      const verified = expectedHash ? (await sha256Hex(await blob.arrayBuffer())) === expectedHash : null;
+      const url = URL.createObjectURL(blob);
       // The History row's link only downloads when clicked - if nothing
       // ever gets clicked, the file exists in the tab but never reaches
       // disk. Trigger the save automatically the moment it's ready; the
@@ -522,7 +680,8 @@ function startIncoming(name, size, fromName) {
       const a = document.createElement('a');
       a.href = url; a.download = name;
       document.body.appendChild(a); a.click(); a.remove();
-      addReceivedRow(name, size, fromName, url);
+      addReceivedRow(name, size, fromName, url, verified);
+      return verified;
     }
   };
 }
@@ -531,6 +690,17 @@ function fmtSize(n) {
   if (n < 1024) return n + ' B';
   if (n < 1024 * 1024) return (n / 1024).toFixed(1) + ' KB';
   return (n / (1024 * 1024)).toFixed(1) + ' MB';
+}
+function fmtSpeed(bytesPerSec) { return fmtSize(bytesPerSec) + '/s'; }
+function fmtETA(sec) {
+  if (!isFinite(sec) || sec <= 0) return '';
+  if (sec < 60) return Math.ceil(sec) + 's';
+  return Math.floor(sec / 60) + 'm ' + Math.round(sec % 60) + 's';
+}
+function verifyLabel(verified) {
+  if (verified === true) return ' &middot; <span style="color:var(--green)">verified &#10003;</span>';
+  if (verified === false) return ' &middot; <span style="color:var(--red)">checksum mismatch &#9888;</span>';
+  return '';
 }
 
 function fmtTime() {
@@ -564,7 +734,7 @@ function addPendingRow(name, fromName) {
   updateTabBadges();
 }
 
-function addReceivedRow(name, size, fromName, blobUrl) {
+function addReceivedRow(name, size, fromName, blobUrl, verified) {
   const list = document.getElementById('historyList');
   if (list.querySelector('.empty')) list.innerHTML = '';
   const pendingKey = fromName + '|' + name;
@@ -590,7 +760,7 @@ function addReceivedRow(name, size, fromName, blobUrl) {
   }
   const fromEl = document.createElement('div');
   fromEl.className = 'from';
-  fromEl.textContent = 'received from ' + fromName;
+  fromEl.innerHTML = 'received from ' + fromName + verifyLabel(verified);
   meta.appendChild(nameEl); meta.appendChild(fromEl);
   row.appendChild(meta);
   const right = document.createElement('div');
@@ -618,13 +788,14 @@ function showActiveEmptyIfNeeded() {
   if (!list.children.length) list.innerHTML = '<div class="empty">No active transfers. Select files and hit Send.</div>';
 }
 
-const sentRows = new Map(); // peerId|name -> { row, statusEl, iconEl, barEl, toName }
+const sentRows = new Map(); // peerId|name -> { row, statusEl, iconEl, barEl, toName, file, peerId }
 
 // A row starts as "waiting" (clock icon, empty bar) the moment Send is
 // clicked, before its turn in the sequential send loop - matches the
 // reference design, where every queued item is visible immediately instead
-// of appearing one at a time.
-function addSentRow(peerId, name, size, toName) {
+// of appearing one at a time. `file` is kept on the entry so History's
+// re-send button can re-queue it without a file-picker round trip.
+function addSentRow(peerId, name, size, toName, file) {
   const list = document.getElementById('activeList');
   if (list.querySelector('.empty')) list.innerHTML = '';
   const row = document.createElement('div');
@@ -634,17 +805,31 @@ function addSentRow(peerId, name, size, toName) {
     `<div class="meta"><div class="name">${name}</div>` +
     `<div class="from">&rarr; ${toName} &middot; ${fmtSize(size)}</div></div>` +
     `<span class="status-icon wait">${ICON.clock}</span>` +
+    `<button class="resend-btn hidden" title="Re-send">&#8635;</button>` +
     `<div class="progress"><div class="progress-bar" style="width:0%"></div></div>`;
   list.prepend(row);
   const entry = {
-    row, toName,
+    row, toName, file, peerId,
     statusEl: row.querySelector('.from'),
     iconEl: row.querySelector('.status-icon'),
     barEl: row.querySelector('.progress-bar'),
+    resendBtn: row.querySelector('.resend-btn'),
   };
+  entry.resendBtn.onclick = () => resendFile(entry);
   sentRows.set(peerId + '|' + name, entry);
   updateTabBadges();
   return entry;
+}
+
+function resendFile(entry) {
+  const target = conns.get(entry.peerId);
+  if (!target || !target.conn.open) { alert(entry.toName + ' is no longer connected.'); return; }
+  broadcastAll = false;
+  selectedPeer = entry.peerId;
+  queue.push(entry.file);
+  renderQueue();
+  renderPeerList();
+  switchTab('queue');
 }
 
 function markSending(peerId, name) {
@@ -655,9 +840,14 @@ function markSending(peerId, name) {
   entry.statusEl.textContent = 'sending to ' + entry.toName + '...';
 }
 
-function markProgress(peerId, name, fraction) {
+function markProgress(peerId, name, fraction, speedBps, etaSec) {
   const entry = sentRows.get(peerId + '|' + name);
-  if (entry) entry.barEl.style.width = Math.round(fraction * 100) + '%';
+  if (!entry) return;
+  entry.barEl.style.width = Math.round(fraction * 100) + '%';
+  if (speedBps > 0) {
+    entry.statusEl.textContent = 'sending to ' + entry.toName + ' · ' + fmtSpeed(speedBps) +
+      (etaSec > 0 && fraction < 1 ? ' · ETA ' + fmtETA(etaSec) : '');
+  }
 }
 
 function markSent(peerId, name) {
@@ -674,6 +864,7 @@ function markSent(peerId, name) {
 // place, matching how the reference design separates the two tabs.
 function moveToHistory(entry) {
   entry.row.querySelector('.progress')?.remove();
+  entry.resendBtn.classList.remove('hidden');
   entry.row.remove();
   const list = document.getElementById('historyList');
   if (list.querySelector('.empty')) list.innerHTML = '';
@@ -682,12 +873,12 @@ function moveToHistory(entry) {
   updateTabBadges();
 }
 
-function markDelivered(peerId, name) {
+function markDelivered(peerId, name, verified) {
   const entry = sentRows.get(peerId + '|' + name);
   if (!entry) return;
   entry.iconEl.className = 'status-icon ok';
   entry.iconEl.innerHTML = ICON.check;
-  entry.statusEl.textContent = 'delivered to ' + entry.toName;
+  entry.statusEl.innerHTML = 'delivered to ' + entry.toName + verifyLabel(verified);
   moveToHistory(entry);
 }
 
@@ -742,12 +933,13 @@ function renderQueue() {
 }
 
 function updateSendButton() {
-  const target = selectedPeer && conns.get(selectedPeer);
+  const targets = sendTargets();
   const btn = document.getElementById('sendBtn');
   const totalEl = document.getElementById('sendTotal');
-  btn.disabled = !queue.length || !target || !target.conn.open;
-  if (queue.length && target) {
-    btn.textContent = `Send ${queue.length} file${queue.length > 1 ? 's' : ''} → ${target.name}`;
+  btn.disabled = !queue.length || !targets.length;
+  if (queue.length && targets.length) {
+    const dest = broadcastAll ? `All (${targets.length})` : targets[0].name;
+    btn.textContent = `Send ${queue.length} file${queue.length > 1 ? 's' : ''} → ${dest}`;
     totalEl.textContent = fmtSize(queue.reduce((n, f) => n + f.size, 0)) + ' total';
     totalEl.classList.remove('hidden');
   } else {
@@ -811,41 +1003,36 @@ const CHUNK = 16 * 1024;
 // naturally shows "MyFolder/photo.jpg" and Chrome recreates the subfolder
 // under Downloads on save (a "/" in a download's suggested filename does
 // that automatically - no directory-picker or extra protocol needed).
+// Reads the whole file once (already the app's documented tradeoff for
+// files up to ~1-2GB, see startIncoming above) - one pass both hashes it
+// for the receiver's corruption check and feeds the chunked send loop,
+// instead of a stream reader plus a separate hashing pass.
 async function sendFileTo(conn, file, toName) {
   const dc = conn.dataChannel;
   const path = file.webkitRelativePath || file.name;
   markSending(conn.peer, path);
-  dc.send(JSON.stringify({ type: 'file-start', name: path, size: file.size }));
-  const reader = file.stream().getReader();
+  const buf = await file.arrayBuffer();
+  const hash = await sha256Hex(buf);
+  dc.send(JSON.stringify({ type: 'file-start', name: path, size: file.size, sha256: hash }));
+  const startTime = performance.now();
   let sent = 0;
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    for (let off = 0; off < value.byteLength; off += CHUNK) {
-      const slice = value.slice(off, off + CHUNK).buffer;
-      while (dc.bufferedAmount > 8 * 1024 * 1024) {
-        await new Promise(r => setTimeout(r, 20));
-      }
-      dc.send(slice);
-      sent += slice.byteLength;
-      markProgress(conn.peer, path, file.size ? sent / file.size : 1);
+  for (let off = 0; off < buf.byteLength; off += CHUNK) {
+    const slice = buf.slice(off, off + CHUNK);
+    while (dc.bufferedAmount > 8 * 1024 * 1024) {
+      await new Promise(r => setTimeout(r, 20));
     }
+    dc.send(slice);
+    sent += slice.byteLength;
+    const elapsed = (performance.now() - startTime) / 1000;
+    const speed = elapsed > 0 ? sent / elapsed : 0;
+    const eta = speed > 0 ? (buf.byteLength - sent) / speed : 0;
+    markProgress(conn.peer, path, buf.byteLength ? sent / buf.byteLength : 1, speed, eta);
   }
   dc.send(JSON.stringify({ type: 'file-end' }));
   markSent(conn.peer, path);
 }
 
-document.getElementById('sendBtn').addEventListener('click', async () => {
-  const target = selectedPeer && conns.get(selectedPeer);
-  if (!target || !target.conn.open) { alert('pick a connected device to send to'); return; }
-  if (!queue.length) return;
-  const toSend = queue;
-  queue = [];
-  renderQueue();
-  switchTab('queue');
-  // Every queued file gets a row immediately (clock icon, matching the
-  // reference design) instead of appearing one at a time as its turn comes.
-  for (const file of toSend) addSentRow(target.conn.peer, file.webkitRelativePath || file.name, file.size, target.name);
+async function sendQueueToTarget(target, toSend) {
   target.busy = true;
   renderPeerList();
   for (const file of toSend) {
@@ -858,6 +1045,24 @@ document.getElementById('sendBtn').addEventListener('click', async () => {
   }
   target.busy = false;
   renderPeerList();
+}
+
+document.getElementById('sendBtn').addEventListener('click', async () => {
+  const targets = sendTargets();
+  if (!targets.length) { alert('pick a connected device to send to'); return; }
+  if (!queue.length) return;
+  const toSend = queue;
+  queue = [];
+  renderQueue();
+  switchTab('queue');
+  // Every queued file gets a row immediately (clock icon, matching the
+  // reference design) instead of appearing one at a time as its turn comes.
+  // Different targets are different dataChannels, so they run in parallel;
+  // within one target, files still go strictly one at a time.
+  for (const target of targets) {
+    for (const file of toSend) addSentRow(target.conn.peer, file.webkitRelativePath || file.name, file.size, target.name, file);
+  }
+  await Promise.all(targets.map(target => sendQueueToTarget(target, toSend)));
 });
 
 // Plain drag-drop only gives top-level dropped items; a dropped folder's
