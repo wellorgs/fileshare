@@ -308,7 +308,7 @@ body.dragging{outline:3px dashed var(--blue);outline-offset:-3px}
 </div>
 
 <script>
-const VERSION = 'v38';
+const VERSION = 'v39';
 document.getElementById('versionTag').textContent = '· ' + VERSION;
 
 const themeToggle = document.getElementById('themeToggle');
@@ -354,8 +354,21 @@ const conns = new Map(); // conn.peer -> { conn, name, os, avatar, myStatus, bus
 let selectedPeer = null; // peerId of the device files will be sent to
 const statusEl = document.getElementById('status');
 const dotEl = document.getElementById('dot');
+// No browser API exposes the OS device/computer name (same reason there's
+// no real local IP - see the removed detectLocalIP, v33) - default to a
+// random classic-style name (AirDrop/Nearby Share convention) instead of
+// leaving the field blank, generated once and kept stable in localStorage.
+const NAME_ADJ = ['Swift', 'Quiet', 'Clever', 'Brave', 'Happy', 'Lucky', 'Calm', 'Bold', 'Gentle', 'Sunny', 'Mighty', 'Nimble'];
+const NAME_NOUN = ['Falcon', 'Panda', 'Otter', 'Tiger', 'Wolf', 'Fox', 'Eagle', 'Dolphin', 'Koala', 'Lynx', 'Raven', 'Badger'];
+function randomDeviceName() {
+  return NAME_ADJ[Math.floor(Math.random() * NAME_ADJ.length)] + ' ' + NAME_NOUN[Math.floor(Math.random() * NAME_NOUN.length)];
+}
 const nameInput = document.getElementById('myName');
-nameInput.value = localStorage.getItem('shareName') || '';
+nameInput.value = localStorage.getItem('shareName') || (() => {
+  const n = randomDeviceName();
+  localStorage.setItem('shareName', n);
+  return n;
+})();
 nameInput.addEventListener('input', () => { localStorage.setItem('shareName', nameInput.value); renderTopbarMe(); broadcastHello(); });
 
 function myName() { return nameInput.value.trim() || 'a device'; }
