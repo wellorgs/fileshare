@@ -1594,7 +1594,7 @@ async function sendZippedFolder(conn, files, zipName, toName) {
       }
     }
   } catch (err) {
-    throw new Error('connection to ' + toName + ' dropped while zipping/sending - would need to restart from scratch');
+    throw new Error('connection to ' + toName + ' dropped while zipping/sending (' + err.message + ') - would need to restart from scratch');
   }
   dc.send(JSON.stringify({ type: 'file-end' }));
   markSent(conn.peer, zipName);
@@ -1618,7 +1618,13 @@ function addFilesMaybeZippingFolder(files) {
 
 // ---- sending ----
 
-const CHUNK = 16 * 1024;
+// 256KB - up from an earlier 16KB. Each dc.send() call has real per-message
+// SCTP framing overhead; at 16KB a multi-GB transfer was tens of thousands
+// of tiny sends, which measured out to ~1MB/s on a real transfer despite a
+// much faster underlying connection. 256KB stays comfortably under every
+// browser's safe RTCDataChannel message-size limit while cutting message
+// count 16x.
+const CHUNK = 256 * 1024;
 // A folder's files carry their relative path in .webkitRelativePath - that
 // path is used as the transferred "name" throughout, so the receiver
 // naturally shows "MyFolder/photo.jpg" and Chrome recreates the subfolder
