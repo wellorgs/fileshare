@@ -1,15 +1,18 @@
-// Cloudflare Worker: proxies Metered's TURN credential endpoint so the
-// Metered API key never ships in the static page's JS. Edge-caches the
-// response for 5 minutes so upstream Metered usage is capped at roughly
+// Cloudflare Worker: proxies Cloudflare Realtime's TURN credential endpoint
+// so the TURN key's API token never ships in the static page's JS. Edge-
+// caches the response for 5 minutes so upstream usage is capped at roughly
 // one call per cache window regardless of how much traffic hits this
-// worker (scraped URL included) - that cap is what actually protects the
-// $30 credit, not the CORS check below (CORS only stops in-browser callers,
-// not curl/scripts, but they still only ever get the cached response).
+// worker (scraped URL included) - that cap is what protects the free
+// 1000GB/month quota, not the CORS check below (CORS only stops in-browser
+// callers, not curl/scripts, but they still only ever get the cached
+// response).
 //
 // Deploy: Cloudflare dashboard -> Workers & Pages -> Create Worker -> paste
-// this file -> Settings -> Variables -> add secret METERED_API_KEY -> Deploy.
+// this file -> Settings -> Variables -> add secrets TURN_KEY_ID and
+// TURN_KEY_API_TOKEN (from dash.cloudflare.com/?to=/:account/calls ->
+// TURN Keys -> Create) -> Deploy.
 const ALLOWED_ORIGIN = 'https://wellorgs.github.io';
-const METERED_DOMAIN = 'newfileshare.metered.live';
+const CREDENTIAL_TTL_SECONDS = 86400; // 24h - safely longer than any single transfer
 
 export default {
   async fetch(request, env, ctx) {
@@ -25,11 +28,21 @@ export default {
     const cached = await cache.match(cacheKey);
     if (cached) return new Response(cached.body, { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 
-    const upstream = await fetch(`https://${METERED_DOMAIN}/api/v1/turn/credentials?apiKey=${env.METERED_API_KEY}`);
+    const upstream = await fetch(
+      `https://rtc.live.cloudflare.com/v1/turn/keys/${env.TURN_KEY_ID}/credentials/generate-ice-servers`,
+      {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${env.TURN_KEY_API_TOKEN}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ttl: CREDENTIAL_TTL_SECONDS }),
+      }
+    );
     if (!upstream.ok) return new Response('turn credential fetch failed', { status: 502, headers: corsHeaders });
 
-    const body = await upstream.text();
-    const response = new Response(body, {
+    // Cloudflare wraps the array as {iceServers:[...]} - unwrap here so the
+    // frontend's fetchIceConfig() (which expects the plain array, same shape
+    // every other TURN provider's REST API returns) doesn't need to change.
+    const { iceServers } = await upstream.json();
+    const response = new Response(JSON.stringify(iceServers), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json', 'Cache-Control': 'public, max-age=300' },
     });
     ctx.waitUntil(cache.put(cacheKey, response.clone()));
