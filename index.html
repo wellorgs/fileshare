@@ -993,6 +993,20 @@ function addConn(conn) {
     entry = { conn, name, os: meta.os || null, avatar: meta.avatar || null, status: meta.status || 'available' };
   }
   conns.set(conn.peer, entry);
+  // Diagnostic only - logs exactly what the WebRTC layer is doing during
+  // connection setup (ICE gathering/connection state, and any specific
+  // STUN/TURN candidate failures) so a stuck "connecting..." can actually
+  // be diagnosed from a console paste instead of guessed at blind.
+  if (conn.peerConnection) {
+    const pc = conn.peerConnection;
+    const t0 = performance.now();
+    const log = (label) => console.log('[ICE ' + Math.round(performance.now() - t0) + 'ms] ' + label + ': ice=' + pc.iceConnectionState + ' gathering=' + pc.iceGatheringState + ' conn=' + pc.connectionState);
+    log('start');
+    pc.addEventListener('iceconnectionstatechange', () => log('iceconnectionstatechange'));
+    pc.addEventListener('icegatheringstatechange', () => log('icegatheringstatechange'));
+    pc.addEventListener('connectionstatechange', () => log('connectionstatechange'));
+    pc.addEventListener('icecandidateerror', (e) => console.warn('[ICE candidate error] ' + e.errorText + ' (code ' + e.errorCode + ') url=' + e.url));
+  }
   conn.on('open', () => {
     const dc = conn.dataChannel;
     dc.binaryType = 'arraybuffer';
@@ -1602,12 +1616,11 @@ document.getElementById('sendBtn').addEventListener('click', async () => {
 
 // Plain drag-drop only gives top-level dropped items; a dropped folder's
 // contents need walking its DataTransferItem entry tree explicitly.
-// Hidden entries (dotfiles/dotfolders - .git, .DS_Store, etc.) are
-// skipped: dragging a project folder should send the project, not its
-// VCS internals.
+// Sends everything as-is, dotfiles/dotfolders (.git, .DS_Store, etc.)
+// included - a "send this whole folder" request means the whole folder,
+// no silent exclusions the user didn't ask for.
 function readEntry(entry, prefix) {
   return new Promise(resolve => {
-    if (entry.name.startsWith('.')) { resolve([]); return; }
     if (entry.isFile) {
       entry.file(file => {
         try {
@@ -1682,13 +1695,8 @@ document.getElementById('fileInput').addEventListener('change', e => {
   addToQueue([...e.target.files]);
   e.target.value = '';
 });
-// The webkitdirectory picker (unlike drag-and-drop's readEntry, which
-// already skips dotfiles/dotfolders) hands back every file with no
-// filtering - selecting a real project folder pulls in .git internals
-// too. Match the same exclusion here.
 document.getElementById('folderInput').addEventListener('change', e => {
-  const files = [...e.target.files].filter(f => !(f.webkitRelativePath || '').split('/').some(seg => seg.startsWith('.')));
-  addToQueue(files);
+  addToQueue([...e.target.files]);
   e.target.value = '';
 });
 document.getElementById('pickFilesBtn').addEventListener('click', () => document.getElementById('fileInput').click());
