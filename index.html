@@ -1594,10 +1594,8 @@ async function sendZippedFolder(conn, files, zipName, toName) {
       for (let boff = 0; boff < block.byteLength; boff += CHUNK) {
         if (dc.readyState !== 'open') throw new Error('connection dropped');
         const slice = block.slice(boff, boff + CHUNK);
-        while (dc.bufferedAmount > 8 * 1024 * 1024) {
-          if (dc.readyState !== 'open') throw new Error('connection dropped');
-          await new Promise(r => setTimeout(r, 20));
-        }
+        await waitForBufferedAmountLow(dc, 8 * 1024 * 1024);
+        if (dc.readyState !== 'open') throw new Error('connection dropped');
         dc.send(slice.buffer);
         sent += slice.byteLength;
         const elapsed = (performance.now() - startTime) / 1000;
@@ -1644,6 +1642,25 @@ function addFilesMaybeZippingFolder(files) {
 // browser's safe RTCDataChannel message-size limit while cutting message
 // count 16x.
 const CHUNK = 256 * 1024;
+
+// Every send loop needs to pause when the outgoing buffer is full and
+// resume once it drains. Polling via setTimeout for that (the previous
+// approach here) is throttled hard by Chrome for a backgrounded tab -
+// commonly clamped to roughly once per second - which silently turned
+// every drain-wait into up to a ~1s stall regardless of how fast the
+// actual connection is. A multi-hundred-MB/GB transfer runs for minutes;
+// the tab almost certainly isn't focused the whole time. bufferedamountlow
+// is a real browser event tied to actual network completion, not a JS
+// timer, so it isn't subject to that throttling at all.
+function waitForBufferedAmountLow(dc, threshold) {
+  return new Promise(resolve => {
+    if (dc.bufferedAmount <= threshold) { resolve(); return; }
+    dc.bufferedAmountLowThreshold = threshold;
+    const onLow = () => { dc.removeEventListener('bufferedamountlow', onLow); resolve(); };
+    dc.addEventListener('bufferedamountlow', onLow);
+  });
+}
+
 // A folder's files carry their relative path in .webkitRelativePath - that
 // path is used as the transferred "name" throughout, so the receiver
 // naturally shows "MyFolder/photo.jpg" and Chrome recreates the subfolder
@@ -1705,10 +1722,8 @@ async function sendPreparedFileSmall(conn, prepared, toName) {
     for (let off = startOffset; off < buf.byteLength; off += CHUNK) {
       if (dc.readyState !== 'open') throw new Error('connection dropped');
       const slice = buf.slice(off, off + CHUNK);
-      while (dc.bufferedAmount > 8 * 1024 * 1024) {
-        if (dc.readyState !== 'open') throw new Error('connection dropped');
-        await new Promise(r => setTimeout(r, 20));
-      }
+      await waitForBufferedAmountLow(dc, 8 * 1024 * 1024);
+      if (dc.readyState !== 'open') throw new Error('connection dropped');
       dc.send(slice);
       sent += slice.byteLength;
       const elapsed = (performance.now() - startTime) / 1000;
@@ -1752,10 +1767,8 @@ async function sendPreparedFileLarge(conn, prepared, toName) {
       for (let boff = 0; boff < blockBuf.byteLength; boff += CHUNK) {
         if (dc.readyState !== 'open') throw new Error('connection dropped');
         const slice = blockBuf.slice(boff, boff + CHUNK);
-        while (dc.bufferedAmount > 8 * 1024 * 1024) {
-          if (dc.readyState !== 'open') throw new Error('connection dropped');
-          await new Promise(r => setTimeout(r, 20));
-        }
+        await waitForBufferedAmountLow(dc, 8 * 1024 * 1024);
+        if (dc.readyState !== 'open') throw new Error('connection dropped');
         dc.send(slice);
         sent += slice.byteLength;
         const elapsed = (performance.now() - startTime) / 1000;
