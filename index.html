@@ -202,7 +202,7 @@ input[type=text]::placeholder{color:var(--sub)}
 .split-arrow{flex:none;width:26px;padding:8px 6px;background:var(--blue);color:#fff;
   border-left:1px solid rgba(255,255,255,.3);font-size:10px;
   border-radius:0 20px 20px 0}
-.split-menu{position:absolute;bottom:calc(100% + 6px);left:0;min-width:140px;
+.split-menu{position:absolute;top:calc(100% + 6px);left:0;min-width:140px;
   background:var(--card);border:1px solid var(--border);border-radius:6px;
   overflow:hidden;z-index:10;box-shadow:0 6px 16px rgba(0,0,0,.35)}
 .split-menu button{display:block;width:100%;text-align:left;padding:9px 12px;
@@ -835,18 +835,37 @@ async function joinRoom(codeOverride) {
   setStatus('connecting to room ' + code + '...', 'pending');
   const config = await iceConfigPromise;
   peer = new Peer({ config });
-  // PeerJS doesn't reliably emit an 'error' when the target id is dead
-  // (room ended, typo'd code) - without this the UI just sits on
-  // "connecting..." forever. Cleared the moment the data connection opens.
-  const stuckTimer = setTimeout(() => {
-    setStatus('error: room not found', 'err');
-    alert('Could not connect: room ' + code + ' not found or no longer active.');
+  let settled = false;
+  function giveUp(message) {
+    if (settled) return;
+    settled = true;
+    clearTimeout(stuckTimer);
+    setStatus('error: connection failed', 'err');
+    alert(message);
     resetPeer();
     document.getElementById('joinStep').classList.remove('hidden');
-  }, 15000);
+  }
+  // PeerJS doesn't reliably emit an 'error' when the target id is dead
+  // (room ended, typo'd code), and cross-network ICE negotiation over TURN
+  // can legitimately take a while on bad wifi - this cap is a last resort
+  // for a connection that's genuinely stalled forever, not a guess at
+  // failure. A real dead room or a real ICE dead-end is caught far sooner
+  // below via peer.on('error') and the iceConnectionState 'failed' check.
+  const stuckTimer = setTimeout(() => {
+    giveUp('Could not connect to room ' + code + ' within 45s - check the code, or the network between devices may be blocking the connection.');
+  }, 45000);
   peer.on('open', () => {
     const conn = peer.connect(code, { reliable: true, metadata: { name: myName(), os: MY_OS, avatar: myAvatar, status: myStatus } });
-    conn.on('open', () => clearTimeout(stuckTimer));
+    conn.on('open', () => { settled = true; clearTimeout(stuckTimer); });
+    // The real, reliable failure signal: ICE has exhausted every candidate
+    // pair with no working path. Firing on this instead of only a flat
+    // timeout means a genuinely dead room fails fast, while a slow-but-real
+    // connection isn't cut off early.
+    conn.peerConnection && conn.peerConnection.addEventListener('iceconnectionstatechange', () => {
+      if (conn.peerConnection.iceConnectionState === 'failed') {
+        giveUp('Could not connect to room ' + code + ' - network path between devices failed.');
+      }
+    });
     addConn(conn);
     document.getElementById('createRoomBtn').classList.add('hidden');
     document.getElementById('endRoomBtn').classList.remove('hidden');
@@ -854,6 +873,7 @@ async function joinRoom(codeOverride) {
   });
   peer.on('connection', c => addConn(c));
   peer.on('error', err => {
+    settled = true;
     clearTimeout(stuckTimer);
     setStatus('error: ' + err.type, 'err');
     alert('Could not connect: ' + err.type + (err.type === 'peer-unavailable' ? ' — check the code' : ''));
@@ -1327,6 +1347,13 @@ function updateTabBadges() {
 
 let queue = []; // array of File (folders already zipped into one File each)
 
+// A real project folder can easily contain tens of thousands of files -
+// one DOM row per file at that scale freezes the tab for a long time
+// building/laying out the list (looked, to a user, exactly like "nothing
+// happened"). Above this count, skip the per-file rows entirely and show
+// one aggregate line instead - nobody scrolls a 78,000-row list anyway.
+const QUEUE_ROW_LIMIT = 300;
+
 function renderQueue() {
   const list = document.getElementById('stagingList');
   if (!queue.length) { list.innerHTML = ''; updateSendButton(); updateTabBadges(); return; }
@@ -1336,19 +1363,27 @@ function renderQueue() {
   head.innerHTML = `<span>${queue.length} file${queue.length > 1 ? 's' : ''} selected</span><a>Clear all</a>`;
   head.querySelector('a').onclick = () => { queue = []; renderQueue(); };
   list.appendChild(head);
-  queue.forEach((file, i) => {
-    const row = document.createElement('div');
-    row.className = 'filerow';
-    row.innerHTML =
-      `<span class="file-icon">${ICON.file}</span>` +
-      `<div class="meta"><div class="name">${file.webkitRelativePath || file.name}</div>` +
-      `<div class="from">${fmtSize(file.size)} &middot; ${file.type || 'application/octet-stream'}</div></div>`;
-    const remove = document.createElement('button');
-    remove.textContent = 'Remove';
-    remove.onclick = () => { queue.splice(i, 1); renderQueue(); };
-    row.appendChild(remove);
-    list.appendChild(row);
-  });
+  if (queue.length > QUEUE_ROW_LIMIT) {
+    const totalSize = queue.reduce((n, f) => n + f.size, 0);
+    const summary = document.createElement('div');
+    summary.className = 'empty';
+    summary.textContent = queue.length + ' files selected (' + fmtSize(totalSize) + ') - too many to list individually, but all will be sent';
+    list.appendChild(summary);
+  } else {
+    queue.forEach((file, i) => {
+      const row = document.createElement('div');
+      row.className = 'filerow';
+      row.innerHTML =
+        `<span class="file-icon">${ICON.file}</span>` +
+        `<div class="meta"><div class="name">${file.webkitRelativePath || file.name}</div>` +
+        `<div class="from">${fmtSize(file.size)} &middot; ${file.type || 'application/octet-stream'}</div></div>`;
+      const remove = document.createElement('button');
+      remove.textContent = 'Remove';
+      remove.onclick = () => { queue.splice(i, 1); renderQueue(); };
+      row.appendChild(remove);
+      list.appendChild(row);
+    });
+  }
   updateSendButton();
   updateTabBadges();
 }
@@ -1647,8 +1682,13 @@ document.getElementById('fileInput').addEventListener('change', e => {
   addToQueue([...e.target.files]);
   e.target.value = '';
 });
+// The webkitdirectory picker (unlike drag-and-drop's readEntry, which
+// already skips dotfiles/dotfolders) hands back every file with no
+// filtering - selecting a real project folder pulls in .git internals
+// too. Match the same exclusion here.
 document.getElementById('folderInput').addEventListener('change', e => {
-  addToQueue([...e.target.files]);
+  const files = [...e.target.files].filter(f => !(f.webkitRelativePath || '').split('/').some(seg => seg.startsWith('.')));
+  addToQueue(files);
   e.target.value = '';
 });
 document.getElementById('pickFilesBtn').addEventListener('click', () => document.getElementById('fileInput').click());
