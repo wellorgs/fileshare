@@ -3,6 +3,7 @@
 <title>FileShare</title>
 <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/fflate@0.8.2/umd/index.js"></script>
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@400;500;600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
@@ -1420,16 +1421,88 @@ function updateSendButton() {
 }
 
 // ---- queuing dropped/picked items ----
-//
-// Folder files carry their relative path in .webkitRelativePath (set
-// natively by a webkitdirectory input, or manually in readEntry() below for
-// drag-and-drop). prepareForSend() already uses that path as the
-// transferred name, and a "/" in it makes Chrome recreate the subfolder
-// under Downloads on save - so a folder's files go straight into the queue
-// as-is, no zipping needed to keep the structure intact.
+
 function addToQueue(fileList) {
   queue.push(...fileList);
   renderQueue();
+}
+
+// ---- folder auto-zip ----
+//
+// A folder can easily be tens of thousands of files - this app's send
+// protocol does one file-start/ack handshake per file, so queuing a real
+// project folder as individual files means tens of thousands of round
+// trips before any bulk data moves, on top of Chrome's own "Upload N
+// files?" gate and native per-file enumeration cost for a folder that
+// size. Zipping into one file first collapses all of that into a single
+// handshake and reuses the existing, already-tested large-file send path
+// unchanged - the receiver just gets a normal .zip in Downloads, and
+// unzipping there is a native OS double-click, no custom receive-side
+// code needed.
+//
+// Streams each source file in BLOCK-sized slices straight into fflate's
+// streaming zip writer instead of reading whole files upfront - memory on
+// the read side stays bounded to one block at a time regardless of
+// whether the folder is 500MB or 5GB. level:0 (store, no compression)
+// because project files are usually already-compressed binaries anyway,
+// and speed matters more here than shaving size.
+function zipFolder(files, zipName, onProgress) {
+  return new Promise((resolve, reject) => {
+    const chunks = [];
+    const zip = new fflate.Zip((err, chunk, final) => {
+      if (err) { reject(err); return; }
+      if (chunk) chunks.push(chunk);
+      if (final) resolve(new File([new Blob(chunks)], zipName));
+    });
+    (async () => {
+      try {
+        const totalBytes = files.reduce((n, f) => n + f.size, 0);
+        let doneBytes = 0;
+        for (const file of files) {
+          const path = file.webkitRelativePath || file.name;
+          const entry = new fflate.ZipDeflate(path, { level: 0 });
+          zip.add(entry);
+          if (file.size === 0) {
+            entry.push(new Uint8Array(0), true);
+          } else {
+            for (let off = 0; off < file.size; off += BLOCK) {
+              const end = Math.min(off + BLOCK, file.size);
+              const buf = new Uint8Array(await file.slice(off, end).arrayBuffer());
+              entry.push(buf, end >= file.size);
+              doneBytes += buf.byteLength;
+              if (onProgress) onProgress(doneBytes, totalBytes);
+            }
+          }
+        }
+        zip.end();
+      } catch (err) { reject(err); }
+    })();
+  });
+}
+
+const dropSub = document.querySelector('.drop-sub');
+const dropSubDefault = dropSub.textContent;
+
+// Any file carrying a "/" in its relative path came from a real folder
+// (drag-and-drop's readEntry and the webkitdirectory picker both only set
+// that for folder-sourced files) - a plain multi-file selection never has
+// one, so this is a reliable "was a folder involved" check without
+// threading extra state through both entry points.
+async function addFilesMaybeZippingFolder(files) {
+  if (!files.length) return;
+  const isFolder = files.some(f => (f.webkitRelativePath || '').includes('/'));
+  if (!isFolder) { addToQueue(files); return; }
+  const topName = (files[0].webkitRelativePath || files[0].name).split('/')[0] || 'folder';
+  try {
+    const zipFile = await zipFolder(files, topName + '.zip', (done, total) => {
+      dropSub.textContent = 'Zipping "' + topName + '"... ' + Math.round((done / total) * 100) + '%';
+    });
+    addToQueue([zipFile]);
+  } catch (err) {
+    alert('Failed to zip "' + topName + '": ' + err.message);
+  } finally {
+    dropSub.textContent = dropSubDefault;
+  }
 }
 
 // ---- sending ----
@@ -1685,7 +1758,7 @@ document.addEventListener('drop', async e => {
     const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error('timed out reading the dropped item(s) - try again, or use Choose files instead')), 20000));
     const files = await Promise.race([filesFromDrop(e.dataTransfer), timeout]);
     if (!files.length) { alert("Couldn't read anything from that drop - try again, or use Choose files."); return; }
-    addToQueue(files);
+    await addFilesMaybeZippingFolder(files);
   } catch (err) {
     alert('Reading the dropped item failed: ' + err.message);
   }
@@ -1695,9 +1768,10 @@ document.getElementById('fileInput').addEventListener('change', e => {
   addToQueue([...e.target.files]);
   e.target.value = '';
 });
-document.getElementById('folderInput').addEventListener('change', e => {
-  addToQueue([...e.target.files]);
+document.getElementById('folderInput').addEventListener('change', async e => {
+  const files = [...e.target.files];
   e.target.value = '';
+  await addFilesMaybeZippingFolder(files);
 });
 document.getElementById('pickFilesBtn').addEventListener('click', () => document.getElementById('fileInput').click());
 
