@@ -835,18 +835,37 @@ async function joinRoom(codeOverride) {
   setStatus('connecting to room ' + code + '...', 'pending');
   const config = await iceConfigPromise;
   peer = new Peer({ config });
-  // PeerJS doesn't reliably emit an 'error' when the target id is dead
-  // (room ended, typo'd code) - without this the UI just sits on
-  // "connecting..." forever. Cleared the moment the data connection opens.
-  const stuckTimer = setTimeout(() => {
-    setStatus('error: room not found', 'err');
-    alert('Could not connect: room ' + code + ' not found or no longer active.');
+  let settled = false;
+  function giveUp(message) {
+    if (settled) return;
+    settled = true;
+    clearTimeout(stuckTimer);
+    setStatus('error: connection failed', 'err');
+    alert(message);
     resetPeer();
     document.getElementById('joinStep').classList.remove('hidden');
-  }, 15000);
+  }
+  // PeerJS doesn't reliably emit an 'error' when the target id is dead
+  // (room ended, typo'd code), and cross-network ICE negotiation over TURN
+  // can legitimately take a while on bad wifi - this cap is a last resort
+  // for a connection that's genuinely stalled forever, not a guess at
+  // failure. A real dead room or a real ICE dead-end is caught far sooner
+  // below via peer.on('error') and the iceConnectionState 'failed' check.
+  const stuckTimer = setTimeout(() => {
+    giveUp('Could not connect to room ' + code + ' within 45s - check the code, or the network between devices may be blocking the connection.');
+  }, 45000);
   peer.on('open', () => {
     const conn = peer.connect(code, { reliable: true, metadata: { name: myName(), os: MY_OS, avatar: myAvatar, status: myStatus } });
-    conn.on('open', () => clearTimeout(stuckTimer));
+    conn.on('open', () => { settled = true; clearTimeout(stuckTimer); });
+    // The real, reliable failure signal: ICE has exhausted every candidate
+    // pair with no working path. Firing on this instead of only a flat
+    // timeout means a genuinely dead room fails fast, while a slow-but-real
+    // connection isn't cut off early.
+    conn.peerConnection && conn.peerConnection.addEventListener('iceconnectionstatechange', () => {
+      if (conn.peerConnection.iceConnectionState === 'failed') {
+        giveUp('Could not connect to room ' + code + ' - network path between devices failed.');
+      }
+    });
     addConn(conn);
     document.getElementById('createRoomBtn').classList.add('hidden');
     document.getElementById('endRoomBtn').classList.remove('hidden');
@@ -854,6 +873,7 @@ async function joinRoom(codeOverride) {
   });
   peer.on('connection', c => addConn(c));
   peer.on('error', err => {
+    settled = true;
     clearTimeout(stuckTimer);
     setStatus('error: ' + err.type, 'err');
     alert('Could not connect: ' + err.type + (err.type === 'peer-unavailable' ? ' — check the code' : ''));
