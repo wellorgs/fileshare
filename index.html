@@ -1427,82 +1427,169 @@ function addToQueue(fileList) {
   renderQueue();
 }
 
-// ---- folder auto-zip ----
+// ---- folder auto-zip (streamed, not materialized) ----
 //
 // A folder can easily be tens of thousands of files - this app's send
 // protocol does one file-start/ack handshake per file, so queuing a real
 // project folder as individual files means tens of thousands of round
 // trips before any bulk data moves, on top of Chrome's own "Upload N
 // files?" gate and native per-file enumeration cost for a folder that
-// size. Zipping into one file first collapses all of that into a single
-// handshake and reuses the existing, already-tested large-file send path
-// unchanged - the receiver just gets a normal .zip in Downloads, and
-// unzipping there is a native OS double-click, no custom receive-side
-// code needed.
+// size. Bundling into one zip collapses that into a single handshake.
 //
-// Streams each source file in BLOCK-sized slices straight into fflate's
-// streaming zip writer instead of reading whole files upfront - memory on
-// the read side stays bounded to one block at a time regardless of
-// whether the folder is 500MB or 5GB. level:0 (store, no compression)
-// because project files are usually already-compressed binaries anyway,
-// and speed matters more here than shaving size.
-function zipFolder(files, zipName, onProgress) {
-  return new Promise((resolve, reject) => {
-    const chunks = [];
-    const zip = new fflate.Zip((err, chunk, final) => {
-      if (err) { reject(err); return; }
-      if (chunk) chunks.push(chunk);
-      if (final) resolve(new File([new Blob(chunks)], zipName));
-    });
-    (async () => {
-      try {
-        const totalBytes = files.reduce((n, f) => n + f.size, 0);
-        let doneBytes = 0;
-        for (const file of files) {
-          const path = file.webkitRelativePath || file.name;
-          const entry = new fflate.ZipDeflate(path, { level: 0 });
-          zip.add(entry);
-          if (file.size === 0) {
-            entry.push(new Uint8Array(0), true);
-          } else {
-            for (let off = 0; off < file.size; off += BLOCK) {
-              const end = Math.min(off + BLOCK, file.size);
-              const buf = new Uint8Array(await file.slice(off, end).arrayBuffer());
-              entry.push(buf, end >= file.size);
-              doneBytes += buf.byteLength;
-              if (onProgress) onProgress(doneBytes, totalBytes);
-            }
-          }
-        }
-        zip.end();
-      } catch (err) { reject(err); }
-    })();
-  });
+// A first version built the whole zip into one Blob before sending -
+// bounded on the READ side (BLOCK-sized slices) but not on the write
+// side, so a multi-GB folder still meant holding the entire compressed
+// output in memory at once. That crashed the browser on a real ~4GB
+// folder. This version never materializes the zip at all: a small
+// backpressured pipe connects the zip producer (reading source files in
+// BLOCK-sized slices, feeding fflate's streaming writer) directly to the
+// same block-hash-and-send loop sendPreparedFileLarge already uses for
+// real files, pulling BLOCK-sized pieces out of the pipe as it sends.
+// Peak memory is bounded to roughly one highWaterMark's worth
+// (~16MB) regardless of whether the folder is 500MB or 50GB.
+class BackpressuredPipe {
+  constructor(highWaterMark) {
+    this.highWaterMark = highWaterMark;
+    this.queue = [];
+    this.buffered = 0;
+    this.ended = false;
+    this.err = null;
+    this._readWaiters = [];
+    this._drainWaiters = [];
+  }
+  // Called synchronously from fflate's output callback - just enqueues.
+  write(chunk) {
+    this.queue.push(chunk);
+    this.buffered += chunk.byteLength;
+    this._wake(this._readWaiters);
+  }
+  end(err) { this.ended = true; this.err = err || null; this._wake(this._readWaiters); }
+  _wake(list) { while (list.length) list.shift()(); }
+  // Called by the producer loop after each push, so it can't run far
+  // ahead of however fast the network is actually consuming.
+  async waitForDrain() {
+    if (this.buffered <= this.highWaterMark) return;
+    await new Promise(resolve => this._drainWaiters.push(resolve));
+  }
+  // Reads exactly n bytes, or fewer only once ended with less remaining.
+  // Returns null once fully drained.
+  async read(n) {
+    while (this.buffered < n && !this.ended) {
+      await new Promise(resolve => this._readWaiters.push(resolve));
+    }
+    if (this.err) throw this.err;
+    const want = Math.min(n, this.buffered);
+    if (want === 0) return null;
+    const out = new Uint8Array(want);
+    let filled = 0;
+    while (filled < want) {
+      const head = this.queue[0];
+      const take = Math.min(head.byteLength, want - filled);
+      out.set(head.subarray(0, take), filled);
+      filled += take;
+      this.buffered -= take;
+      if (take === head.byteLength) this.queue.shift(); else this.queue[0] = head.subarray(take);
+    }
+    if (this.buffered <= this.highWaterMark) this._wake(this._drainWaiters);
+    return out;
+  }
 }
 
-const dropSub = document.querySelector('.drop-sub');
-const dropSubDefault = dropSub.textContent;
+// level:0 (store, no compression) because project files are usually
+// already-compressed binaries anyway, and speed matters more here than
+// shaving size.
+async function driveZipIntoPipe(files, pipe) {
+  const zip = new fflate.Zip((err, chunk, final) => {
+    if (err) { pipe.end(err); return; }
+    if (chunk) pipe.write(chunk);
+    if (final) pipe.end();
+  });
+  try {
+    for (const file of files) {
+      const path = file.webkitRelativePath || file.name;
+      const entry = new fflate.ZipDeflate(path, { level: 0 });
+      zip.add(entry);
+      if (file.size === 0) {
+        entry.push(new Uint8Array(0), true);
+      } else {
+        for (let off = 0; off < file.size; off += BLOCK) {
+          const end = Math.min(off + BLOCK, file.size);
+          const buf = new Uint8Array(await file.slice(off, end).arrayBuffer());
+          entry.push(buf, end >= file.size);
+          await pipe.waitForDrain();
+        }
+      }
+    }
+    zip.end();
+  } catch (err) {
+    pipe.end(err);
+  }
+}
+
+// Same file-start/block-start/file-end handshake as sendPreparedFileLarge,
+// same receiver code path (handleLargeFileStart) unchanged - the only
+// difference is the source is a live zip stream instead of file.slice().
+// No pendingResume entry on failure: a dropped connection mid-zip-stream
+// means restarting the whole zip from scratch, not resuming a byte
+// offset - a real limitation, but the tens-of-thousands-of-files
+// alternative this replaces had no resumability either in practice (one
+// failed file among thousands still needed a manual resend).
+async function sendZippedFolder(conn, files, zipName, toName) {
+  const dc = conn.dataChannel;
+  markSending(conn.peer, zipName);
+  const approxSize = files.reduce((n, f) => n + f.size, 0); // display only - real completion is signaled by file-end, not a byte count match
+  try {
+    dc.send(JSON.stringify({ type: 'file-start', name: zipName, size: approxSize, large: true }));
+    await waitForAck(conn.peer, zipName, 120000);
+  } catch (err) {
+    throw new Error(toName + " didn't accept the folder in time");
+  }
+  const pipe = new BackpressuredPipe(4 * BLOCK);
+  driveZipIntoPipe(files, pipe).catch(err => pipe.end(err));
+  const startTime = performance.now();
+  let sent = 0;
+  try {
+    while (true) {
+      const block = await pipe.read(BLOCK);
+      if (block === null) break;
+      const blockHash = await sha256Hex(block.buffer);
+      if (dc.readyState !== 'open') throw new Error('connection dropped');
+      dc.send(JSON.stringify({ type: 'block-start', size: block.byteLength, sha256: blockHash }));
+      for (let boff = 0; boff < block.byteLength; boff += CHUNK) {
+        if (dc.readyState !== 'open') throw new Error('connection dropped');
+        const slice = block.slice(boff, boff + CHUNK);
+        while (dc.bufferedAmount > 8 * 1024 * 1024) {
+          if (dc.readyState !== 'open') throw new Error('connection dropped');
+          await new Promise(r => setTimeout(r, 20));
+        }
+        dc.send(slice.buffer);
+        sent += slice.byteLength;
+        const elapsed = (performance.now() - startTime) / 1000;
+        const speed = elapsed > 0 ? sent / elapsed : 0;
+        markProgress(conn.peer, zipName, approxSize ? Math.min(sent / approxSize, 1) : 1, speed, 0);
+      }
+    }
+  } catch (err) {
+    throw new Error('connection to ' + toName + ' dropped while zipping/sending - would need to restart from scratch');
+  }
+  dc.send(JSON.stringify({ type: 'file-end' }));
+  markSent(conn.peer, zipName);
+}
 
 // Any file carrying a "/" in its relative path came from a real folder
 // (drag-and-drop's readEntry and the webkitdirectory picker both only set
 // that for folder-sourced files) - a plain multi-file selection never has
 // one, so this is a reliable "was a folder involved" check without
-// threading extra state through both entry points.
-async function addFilesMaybeZippingFolder(files) {
+// threading extra state through both entry points. Queues a lightweight
+// job object, not a materialized zip - the actual zipping happens
+// streamed, at send time, inside sendZippedFolder.
+function addFilesMaybeZippingFolder(files) {
   if (!files.length) return;
   const isFolder = files.some(f => (f.webkitRelativePath || '').includes('/'));
   if (!isFolder) { addToQueue(files); return; }
   const topName = (files[0].webkitRelativePath || files[0].name).split('/')[0] || 'folder';
-  try {
-    const zipFile = await zipFolder(files, topName + '.zip', (done, total) => {
-      dropSub.textContent = 'Zipping "' + topName + '"... ' + Math.round((done / total) * 100) + '%';
-    });
-    addToQueue([zipFile]);
-  } catch (err) {
-    alert('Failed to zip "' + topName + '": ' + err.message);
-  } finally {
-    dropSub.textContent = dropSubDefault;
-  }
+  const size = files.reduce((n, f) => n + f.size, 0);
+  addToQueue([{ isFolderZip: true, files, name: topName + '.zip', size, type: 'application/zip' }]);
 }
 
 // ---- sending ----
@@ -1659,8 +1746,12 @@ async function sendQueueToTarget(target, toSend) {
   for (const file of toSend) {
     const path = file.webkitRelativePath || file.name;
     try {
-      const prepared = await prepareForSend(file);
-      await sendPreparedFile(target.conn, prepared, target.name);
+      if (file.isFolderZip) {
+        await sendZippedFolder(target.conn, file.files, file.name, target.name);
+      } else {
+        const prepared = await prepareForSend(file);
+        await sendPreparedFile(target.conn, prepared, target.name);
+      }
     } catch (err) {
       markFailed(target.conn.peer, path, err.message);
     }
