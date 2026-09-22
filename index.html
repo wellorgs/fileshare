@@ -1495,6 +1495,26 @@ class BackpressuredPipe {
   }
 }
 
+// `await`ing a Promise that resolves via another Promise (waitForDrain
+// when nothing needs to drain, sha256Hex on a small/fast buffer, etc.) is
+// only a microtask - it never actually hands control back to the browser
+// to paint or process its own hang-detector checks. A folder with
+// thousands of files or blocks can chain enough of these back-to-back to
+// starve the main thread for minutes even though every individual step
+// is "async" - that's what "page unresponsive" was, not a memory issue
+// (confirmed: it happened at 16% progress, long before this design's
+// bounded ~16MB memory ceiling could be the cause). This forces a real
+// macrotask yield at least every 50ms of continuous work.
+function makePacer(intervalMs) {
+  let last = performance.now();
+  return async () => {
+    if (performance.now() - last > intervalMs) {
+      await new Promise(r => setTimeout(r, 0));
+      last = performance.now();
+    }
+  };
+}
+
 // level:0 (store, no compression) because project files are usually
 // already-compressed binaries anyway, and speed matters more here than
 // shaving size.
@@ -1504,6 +1524,7 @@ async function driveZipIntoPipe(files, pipe) {
     if (chunk) pipe.write(chunk);
     if (final) pipe.end();
   });
+  const pace = makePacer(50);
   try {
     for (const file of files) {
       const path = file.webkitRelativePath || file.name;
@@ -1519,6 +1540,7 @@ async function driveZipIntoPipe(files, pipe) {
           await pipe.waitForDrain();
         }
       }
+      await pace();
     }
     zip.end();
   } catch (err) {
@@ -1548,6 +1570,7 @@ async function sendZippedFolder(conn, files, zipName, toName) {
   driveZipIntoPipe(files, pipe).catch(err => pipe.end(err));
   const startTime = performance.now();
   let sent = 0;
+  const pace = makePacer(50);
   try {
     while (true) {
       const block = await pipe.read(BLOCK);
@@ -1567,6 +1590,7 @@ async function sendZippedFolder(conn, files, zipName, toName) {
         const elapsed = (performance.now() - startTime) / 1000;
         const speed = elapsed > 0 ? sent / elapsed : 0;
         markProgress(conn.peer, zipName, approxSize ? Math.min(sent / approxSize, 1) : 1, speed, 0);
+        await pace();
       }
     }
   } catch (err) {
