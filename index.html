@@ -1518,7 +1518,14 @@ function makePacer(intervalMs) {
 // level:0 (store, no compression) because project files are usually
 // already-compressed binaries anyway, and speed matters more here than
 // shaving size.
-async function driveZipIntoPipe(files, pipe) {
+// `skipped` collects files that couldn't be read (locked by another
+// process, a cloud-sync placeholder not yet downloaded locally, deleted
+// mid-transfer, etc.) instead of letting one bad file out of tens of
+// thousands abort an entire multi-GB, many-minute transfer. The zip
+// entry for a skipped file is still finalized (possibly with whatever
+// partial content was read before the failure) so the zip stream itself
+// stays valid - the caller reports what got skipped once sending finishes.
+async function driveZipIntoPipe(files, pipe, skipped) {
   const zip = new fflate.Zip((err, chunk, final) => {
     if (err) { pipe.end(err); return; }
     if (chunk) pipe.write(chunk);
@@ -1530,15 +1537,20 @@ async function driveZipIntoPipe(files, pipe) {
       const path = file.webkitRelativePath || file.name;
       const entry = new fflate.ZipDeflate(path, { level: 0 });
       zip.add(entry);
-      if (file.size === 0) {
-        entry.push(new Uint8Array(0), true);
-      } else {
-        for (let off = 0; off < file.size; off += BLOCK) {
-          const end = Math.min(off + BLOCK, file.size);
-          const buf = new Uint8Array(await file.slice(off, end).arrayBuffer());
-          entry.push(buf, end >= file.size);
-          await pipe.waitForDrain();
+      try {
+        if (file.size === 0) {
+          entry.push(new Uint8Array(0), true);
+        } else {
+          for (let off = 0; off < file.size; off += BLOCK) {
+            const end = Math.min(off + BLOCK, file.size);
+            const buf = new Uint8Array(await file.slice(off, end).arrayBuffer());
+            entry.push(buf, end >= file.size);
+            await pipe.waitForDrain();
+          }
         }
+      } catch (err) {
+        skipped.push(path + ': ' + err.message);
+        entry.push(new Uint8Array(0), true);
       }
       await pace();
     }
@@ -1567,7 +1579,8 @@ async function sendZippedFolder(conn, files, zipName, toName) {
     throw new Error(toName + " didn't accept the folder in time");
   }
   const pipe = new BackpressuredPipe(4 * BLOCK);
-  driveZipIntoPipe(files, pipe).catch(err => pipe.end(err));
+  const skipped = [];
+  driveZipIntoPipe(files, pipe, skipped).catch(err => pipe.end(err));
   const startTime = performance.now();
   let sent = 0;
   const pace = makePacer(50);
@@ -1598,6 +1611,12 @@ async function sendZippedFolder(conn, files, zipName, toName) {
   }
   dc.send(JSON.stringify({ type: 'file-end' }));
   markSent(conn.peer, zipName);
+  if (skipped.length) {
+    const preview = skipped.slice(0, 20).join('\n');
+    alert('Sent, but ' + skipped.length + ' file' + (skipped.length > 1 ? 's' : '') + ' inside the folder could not be read and ' +
+      (skipped.length > 1 ? 'were' : 'was') + ' skipped (locked, a cloud-sync placeholder, or deleted mid-transfer):\n\n' +
+      preview + (skipped.length > 20 ? '\n...and ' + (skipped.length - 20) + ' more' : ''));
+  }
 }
 
 // Any file carrying a "/" in its relative path came from a real folder
