@@ -750,9 +750,10 @@ function renderTargetHeader() {
 }
 
 // TURN credentials come from our own Cloudflare Worker (cf-worker/turn-proxy.js),
-// which holds the Metered API key server-side and edge-caches the response -
-// the key never ships in this page. Falls back to the free openrelay pool
-// only if that worker is unreachable, so a room can still be created either way.
+// which holds the Cloudflare Realtime TURN key server-side and edge-caches
+// the response - the key never ships in this page. Falls back to the free
+// openrelay pool only if that worker is unreachable, so a room can still be
+// created either way.
 const TURN_PROXY_URL = 'https://fileshare.assistyai.workers.dev/';
 const FALLBACK_ICE_CONFIG = {
   iceServers: [
