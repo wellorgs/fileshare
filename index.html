@@ -1327,6 +1327,13 @@ function updateTabBadges() {
 
 let queue = []; // array of File (folders already zipped into one File each)
 
+// A real project folder can easily contain tens of thousands of files -
+// one DOM row per file at that scale freezes the tab for a long time
+// building/laying out the list (looked, to a user, exactly like "nothing
+// happened"). Above this count, skip the per-file rows entirely and show
+// one aggregate line instead - nobody scrolls a 78,000-row list anyway.
+const QUEUE_ROW_LIMIT = 300;
+
 function renderQueue() {
   const list = document.getElementById('stagingList');
   if (!queue.length) { list.innerHTML = ''; updateSendButton(); updateTabBadges(); return; }
@@ -1336,19 +1343,27 @@ function renderQueue() {
   head.innerHTML = `<span>${queue.length} file${queue.length > 1 ? 's' : ''} selected</span><a>Clear all</a>`;
   head.querySelector('a').onclick = () => { queue = []; renderQueue(); };
   list.appendChild(head);
-  queue.forEach((file, i) => {
-    const row = document.createElement('div');
-    row.className = 'filerow';
-    row.innerHTML =
-      `<span class="file-icon">${ICON.file}</span>` +
-      `<div class="meta"><div class="name">${file.webkitRelativePath || file.name}</div>` +
-      `<div class="from">${fmtSize(file.size)} &middot; ${file.type || 'application/octet-stream'}</div></div>`;
-    const remove = document.createElement('button');
-    remove.textContent = 'Remove';
-    remove.onclick = () => { queue.splice(i, 1); renderQueue(); };
-    row.appendChild(remove);
-    list.appendChild(row);
-  });
+  if (queue.length > QUEUE_ROW_LIMIT) {
+    const totalSize = queue.reduce((n, f) => n + f.size, 0);
+    const summary = document.createElement('div');
+    summary.className = 'empty';
+    summary.textContent = queue.length + ' files selected (' + fmtSize(totalSize) + ') - too many to list individually, but all will be sent';
+    list.appendChild(summary);
+  } else {
+    queue.forEach((file, i) => {
+      const row = document.createElement('div');
+      row.className = 'filerow';
+      row.innerHTML =
+        `<span class="file-icon">${ICON.file}</span>` +
+        `<div class="meta"><div class="name">${file.webkitRelativePath || file.name}</div>` +
+        `<div class="from">${fmtSize(file.size)} &middot; ${file.type || 'application/octet-stream'}</div></div>`;
+      const remove = document.createElement('button');
+      remove.textContent = 'Remove';
+      remove.onclick = () => { queue.splice(i, 1); renderQueue(); };
+      row.appendChild(remove);
+      list.appendChild(row);
+    });
+  }
   updateSendButton();
   updateTabBadges();
 }
@@ -1647,8 +1662,13 @@ document.getElementById('fileInput').addEventListener('change', e => {
   addToQueue([...e.target.files]);
   e.target.value = '';
 });
+// The webkitdirectory picker (unlike drag-and-drop's readEntry, which
+// already skips dotfiles/dotfolders) hands back every file with no
+// filtering - selecting a real project folder pulls in .git internals
+// too. Match the same exclusion here.
 document.getElementById('folderInput').addEventListener('change', e => {
-  addToQueue([...e.target.files]);
+  const files = [...e.target.files].filter(f => !(f.webkitRelativePath || '').split('/').some(seg => seg.startsWith('.')));
+  addToQueue(files);
   e.target.value = '';
 });
 document.getElementById('pickFilesBtn').addEventListener('click', () => document.getElementById('fileInput').click());
