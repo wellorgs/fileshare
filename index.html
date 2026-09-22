@@ -279,7 +279,7 @@ body.dragging{outline:3px dashed var(--blue);outline-offset:-3px}
   body{height:100vh;overflow:hidden}
   .app{height:100vh}
   .panels{flex-direction:row;flex:1;min-height:0}
-  .sidebar{width:320px;flex:none;overflow-y:visible}
+  .sidebar{width:320px;flex:none;overflow-y:auto}
   .workspace{flex:1;min-width:0;overflow-y:visible;
     border:1px solid var(--border);border-bottom:none;border-radius:8px 8px 0 0;
     box-shadow:0 6px 20px rgba(0,0,0,.2)}
@@ -359,7 +359,7 @@ body.dragging{outline:3px dashed var(--blue);outline-offset:-3px}
         <h3>Start a room</h3>
         <button class="btn btn-danger hidden" id="endRoomBtn" style="padding:3px 12px;font-size:11px">End</button>
       </div>
-      <button class="btn btn-primary" onclick="createRoom()">Create room</button>
+      <button class="btn btn-primary" id="createRoomBtn" onclick="createRoom()">Create room</button>
       <div id="codeBox" class="hidden">
         <div class="code" id="roomCode"></div>
         <div id="qrbox"></div>
@@ -749,13 +749,29 @@ function renderTargetHeader() {
   document.getElementById('targetBusyPill').classList.toggle('hidden', !entry.busy);
 }
 
-const ICE_CONFIG = {
+// TURN credentials come from our own Cloudflare Worker (cf-worker/turn-proxy.js),
+// which holds the Metered API key server-side and edge-caches the response -
+// the key never ships in this page. Falls back to the free openrelay pool
+// only if that worker is unreachable, so a room can still be created either way.
+const TURN_PROXY_URL = 'https://fileshare-turn.wellorgs.workers.dev/';
+const FALLBACK_ICE_CONFIG = {
   iceServers: [
     { urls: 'stun:stun.l.google.com:19302' },
     { urls: 'turn:openrelay.metered.ca:80', username: 'openrelayproject', credential: 'openrelayproject' },
     { urls: 'turn:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' }
   ]
 };
+async function fetchIceConfig() {
+  try {
+    const res = await fetch(TURN_PROXY_URL);
+    if (!res.ok) throw new Error('bad status ' + res.status);
+    return { iceServers: await res.json() };
+  } catch (err) {
+    console.warn('TURN proxy unreachable, falling back to public relay:', err.message);
+    return FALLBACK_ICE_CONFIG;
+  }
+}
+const iceConfigPromise = fetchIceConfig();
 
 function randomCode() { return String(Math.floor(100000 + Math.random() * 900000)); }
 
@@ -778,6 +794,8 @@ function resetPeer() {
 function endRoom() {
   resetPeer();
   document.getElementById('codeBox').classList.add('hidden');
+  document.getElementById('createStep').classList.remove('hidden');
+  document.getElementById('createRoomBtn').classList.remove('hidden');
   document.getElementById('joinStep').classList.remove('hidden');
   document.getElementById('endRoomBtn').classList.add('hidden');
   setStatus('not connected', '');
@@ -785,11 +803,12 @@ function endRoom() {
 }
 document.getElementById('endRoomBtn').addEventListener('click', endRoom);
 
-function createRoom() {
+async function createRoom() {
   resetPeer();
   const code = randomCode();
   setStatus('opening room ' + code + '...', 'pending');
-  peer = new Peer(code, { config: ICE_CONFIG });
+  const config = await iceConfigPromise;
+  peer = new Peer(code, { config });
   peer.on('open', () => {
     document.getElementById('roomCode').textContent = code;
     document.getElementById('codeBox').classList.remove('hidden');
@@ -808,19 +827,33 @@ function createRoom() {
   });
 }
 
-function joinRoom(codeOverride) {
+async function joinRoom(codeOverride) {
   const code = codeOverride || document.getElementById('joinCode').value.trim();
   if (!/^\d{4,6}$/.test(code)) { alert('enter the 4-6 digit code'); return; }
   resetPeer();
   setStatus('connecting to room ' + code + '...', 'pending');
-  peer = new Peer({ config: ICE_CONFIG });
+  const config = await iceConfigPromise;
+  peer = new Peer({ config });
+  // PeerJS doesn't reliably emit an 'error' when the target id is dead
+  // (room ended, typo'd code) - without this the UI just sits on
+  // "connecting..." forever. Cleared the moment the data connection opens.
+  const stuckTimer = setTimeout(() => {
+    setStatus('error: room not found', 'err');
+    alert('Could not connect: room ' + code + ' not found or no longer active.');
+    resetPeer();
+    document.getElementById('joinStep').classList.remove('hidden');
+  }, 15000);
   peer.on('open', () => {
-    addConn(peer.connect(code, { reliable: true, metadata: { name: myName(), os: MY_OS, avatar: myAvatar, status: myStatus } }));
-    document.getElementById('createStep').classList.add('hidden');
+    const conn = peer.connect(code, { reliable: true, metadata: { name: myName(), os: MY_OS, avatar: myAvatar, status: myStatus } });
+    conn.on('open', () => clearTimeout(stuckTimer));
+    addConn(conn);
+    document.getElementById('createRoomBtn').classList.add('hidden');
+    document.getElementById('endRoomBtn').classList.remove('hidden');
     document.getElementById('joinStep').classList.add('hidden');
   });
   peer.on('connection', c => addConn(c));
   peer.on('error', err => {
+    clearTimeout(stuckTimer);
     setStatus('error: ' + err.type, 'err');
     alert('Could not connect: ' + err.type + (err.type === 'peer-unavailable' ? ' — check the code' : ''));
   });
