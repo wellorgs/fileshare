@@ -1616,12 +1616,11 @@ document.getElementById('sendBtn').addEventListener('click', async () => {
 
 // Plain drag-drop only gives top-level dropped items; a dropped folder's
 // contents need walking its DataTransferItem entry tree explicitly.
-// Hidden entries (dotfiles/dotfolders - .git, .DS_Store, etc.) are
-// skipped: dragging a project folder should send the project, not its
-// VCS internals.
+// Sends everything as-is, dotfiles/dotfolders (.git, .DS_Store, etc.)
+// included - a "send this whole folder" request means the whole folder,
+// no silent exclusions the user didn't ask for.
 function readEntry(entry, prefix) {
   return new Promise(resolve => {
-    if (entry.name.startsWith('.')) { resolve([]); return; }
     if (entry.isFile) {
       entry.file(file => {
         try {
@@ -1696,13 +1695,8 @@ document.getElementById('fileInput').addEventListener('change', e => {
   addToQueue([...e.target.files]);
   e.target.value = '';
 });
-// The webkitdirectory picker (unlike drag-and-drop's readEntry, which
-// already skips dotfiles/dotfolders) hands back every file with no
-// filtering - selecting a real project folder pulls in .git internals
-// too. Match the same exclusion here.
 document.getElementById('folderInput').addEventListener('change', e => {
-  const files = [...e.target.files].filter(f => !(f.webkitRelativePath || '').split('/').some(seg => seg.startsWith('.')));
-  addToQueue(files);
+  addToQueue([...e.target.files]);
   e.target.value = '';
 });
 document.getElementById('pickFilesBtn').addEventListener('click', () => document.getElementById('fileInput').click());
