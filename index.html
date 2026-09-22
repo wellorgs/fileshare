@@ -993,6 +993,20 @@ function addConn(conn) {
     entry = { conn, name, os: meta.os || null, avatar: meta.avatar || null, status: meta.status || 'available' };
   }
   conns.set(conn.peer, entry);
+  // Diagnostic only - logs exactly what the WebRTC layer is doing during
+  // connection setup (ICE gathering/connection state, and any specific
+  // STUN/TURN candidate failures) so a stuck "connecting..." can actually
+  // be diagnosed from a console paste instead of guessed at blind.
+  if (conn.peerConnection) {
+    const pc = conn.peerConnection;
+    const t0 = performance.now();
+    const log = (label) => console.log('[ICE ' + Math.round(performance.now() - t0) + 'ms] ' + label + ': ice=' + pc.iceConnectionState + ' gathering=' + pc.iceGatheringState + ' conn=' + pc.connectionState);
+    log('start');
+    pc.addEventListener('iceconnectionstatechange', () => log('iceconnectionstatechange'));
+    pc.addEventListener('icegatheringstatechange', () => log('icegatheringstatechange'));
+    pc.addEventListener('connectionstatechange', () => log('connectionstatechange'));
+    pc.addEventListener('icecandidateerror', (e) => console.warn('[ICE candidate error] ' + e.errorText + ' (code ' + e.errorCode + ') url=' + e.url));
+  }
   conn.on('open', () => {
     const dc = conn.dataChannel;
     dc.binaryType = 'arraybuffer';
